@@ -3,40 +3,42 @@ const game = {
   maxCols: 100,
   bgColor:"rgba(0, 0, 0, 0.85)",
   started: false,
+  enemyBoundary:36, // The row that the enemy will never go below.
   enemyLasers:[], // Each index holds an object with the location of each enemy laser as it moves as well as the ID to it's interval and other important data
   grid:[], // Will hold a 2D grid array that contains important information such as whether each cell is occupied by a player or enemy object. First index is x coordinate that holds another array that's index is the y coordinate that holds the object data. So game.grid[1][2] holds the object for the cell at coordinates x:1, y:2.
   playerDefault: { // Player defaults so when the game starts we can clone this object and spawn the player.
     health: 200,
     movementSpeed: 20,
-    location:[[45,86],[46,86],[44,87],[45,87],[46,87],[47,87],[43,88],[44,88],[45,88],[46,88],[47,88],[48,88],[43,89],[44,89],[47,89],[48,89],[43,90],[48,90]],
+    location:[[48,87],[47,88],[48,88],[49,88],[46,89],[47,89],[48,89],[49,89],[50,89],[46,90],[47,90],[49,90],[50,90],[46,91],[50,91]],
+    deathLocation:[], // Used to render a short animation
     lasers:[], // Each index holds an object with the location of each player laser as it moves as well as the ID to it's interval and other important data
-    laserSpeed:50, // Lower is faster
+    laserSpeed:35, // Lower is faster
     laserColor:"green",
     laserDamage:10,
     color:"white",
     type:"player",
   },
-}
- // Defaults for enemy type one. We clone this data when we spawn an enemy of this type. Initalized AFTER the game object so we can reference the enemyLasers array.
-game.enemyTypeOne = {
+  enemyTypeOne: {
     health: 100,
     movementSpeed: 10,
-    location:[[1,2],[2,3],[4,5]], // Each array position is a segment (cell) of the enemy on the grid that contains it's x,y coordinates. So Location[0][0] = x coordinate of segment 0 and Location[0][1] is the y coordinate of segment 0.
-    moveTimer:0, // Stores this enemy's moving interaval ID
-    attackTimer:0, // stores this enemy's atacking interval ID
+    location:[], // Each array position is a segment (cell) of the enemy on the grid that contains it's x,y coordinates. So Location[0][0] = x coordinate of segment 0 and Location[0][1] is the y coordinate of segment 0.
+    moveInterval:0, // Stores this enemy's moving interaval ID
+    attackInterval:0, // stores this enemy's atacking interval ID
     index:-1, // An index that we use to store on the grid cells that it occupies so we can reference this instance of object during collisions.
-    lasers:game.enemyLasers, // Creates a reference to the game.enemyLasers array
-    laserSpeed:50,
+    lasers:[], // Creates a reference to the game.enemyLasers array
+    laserSpeed:35,
+    attackSpeed:1000,
     laserDamage:5,
     laserColor:"red",
     color:"red",
     type:"enemy", // Used to help modularize functions based on object
+},
   enemyTypeOneSpawnLocations:[
-    [[],[],[],[],[]]
+    [[44,5],[41,4],[42,4],[43,4],[44,4],[45,4],[46,4],[47,4],[46,3],[45,3],[44,3],[43,3],[42,3],[43,2],[43,1],[42,1],[45,2],[45,1],[46,1]] // Spawn location 1 (index 0)
   ],
 }
 let player = {}; // the object that will hold the player data
-let enemy = [null,null,null] // Each index in the array will hold an enemy object or instance of an enemy. We clone the enemy type from one of the default enemies. ie: game.enemy[0] = structuredClone(game.enemyTypeOne)
+let enemy = [null, null, null, null] // Each index in the array will hold an enemy object or instance of an enemy. We clone the enemy type from one of the default enemies. ie: game.enemy[0] = structuredClone(game.enemyTypeOne)
 
 window.onload = function() {
   generateGrid();
@@ -63,6 +65,7 @@ function generateGrid() {
         playerOccupied:false, // true of false depending on if the player occupies this location, mainly for laser logic
         debrisOccupied:-1, // Refers to the index of the debris array for the debris object that occupies this location
         playerLaserOccupied:-1, // Refers to the index of the laser array for the laser object that occupies this location. Used for laser collision.
+        enemyLaserOccupied:-1, // Refers to the index of the enemy laser array for the laser object that occupies this location. Used for laser collision.
         element:elem, // Stores a reference to it's respective DIV element for easier manipulation later.
         color:"rgba(0, 0, 0, 0.85)", // start with background color, this is currently only for dev testing
       });
@@ -76,13 +79,13 @@ document.addEventListener("keydown", event => {
     shootLaser(player);
   } else {
     let direction = "none";
-    if (event.code === "ArrowLeft" && (!edgeDetect("left",player.location))) {
+    if (event.code === "ArrowLeft" && (!invalidMovement("left", player.location))) {
       direction = "left";
-    } else if(event.code === "ArrowRight" && (!edgeDetect("right",player.location))) {
+    } else if(event.code === "ArrowRight" && (!invalidMovement("right", player.location))) {
       direction = "right";
-    } else if(event.code === "ArrowDown" && (!edgeDetect("down",player.location))) {
+    } else if(event.code === "ArrowDown" && (!invalidMovement("down", player.location))) {
       direction = "down";
-    } else if(event.code === "ArrowUp" && (!edgeDetect("up",player.location))) {
+    } else if(event.code === "ArrowUp" && (!invalidMovement("up", player.location))) {
       direction = "up";
     }
     if(direction !== "none") {
@@ -98,8 +101,8 @@ function devTool(element) {
   const x = element.getAttribute("data-x");
   const y = element.getAttribute("data-y");
   if(game.grid[x][y].color === game.bgColor) {
-    element.style.backgroundColor = "red";
-    game.grid[x][y].color = "red";
+    element.style.backgroundColor = "white";
+    game.grid[x][y].color = "white";
   } else {
     element.style.backgroundColor = game.bgColor;
     game.grid[x][y].color = game.bgColor;
@@ -123,17 +126,55 @@ function spawnPlayer(){
   }
 }
 
-// Function for rendering. 
-function render(undraw, location, renderColor) {
-  if(undraw === true) {
-    renderColor = game.bgColor;
+// Enemy spawning logic.
+function spawnEnemy() {
+  if(enemy.indexOf(null) === -1) {
+    return; // return and avoid spawning an enemy since there are no empty slots available for an enemy spawn
   }
-  for(let i=0; i<location.length; i++) {
-    const x = location[i][0];
-    const y = location[i][1];
-    game.grid[x][y].element.style.backgroundColor = renderColor;
+  const index = enemy.indexOf(null); // Sets the index to the first available spot in the enemy array
+  const chosenType = 1; // "1" will be replaced with a random number generator to choose an enemy type. For now we only have one enemy type.
+  let enemyObject; // Used to point to the default enemy object of the chosen type
+  let spawnLocations; // Used to store possible spawn locations to send to the spawn location picker function
+  switch(chosenType) {
+    case 1:
+      enemyObject = game.enemyTypeOne;
+      spawnLocations = game.enemyTypeOneSpawnLocations;
+      break;
   }
+  enemy[index] = structuredClone(enemyObject); // Copies the respective enemy type's default object properties
+  enemy[index].index = index; // Stores the index the object occupies in the enemy array as a property
+  enemy[index].lasers = game.enemyLasers; // Makes the enemy.lasers array reference the game.enemyLasers array so we can store ALL enemy lasers in the same array.
+  enemy[index].location = enemySpawnLocation(spawnLocations); // Calls the function to choose a random, valid spawn location and sets its returned value as the location.
+  gridUpdate("enemy", enemy[index].location, index, false); // Update the grid cells the enemy occupies
+  render(false, enemy[index].location, enemy[index].color); // Renders the enemy object on the board.
+  enemy[index].attackInterval = setInterval(shootLaser, enemy[index].attackSpeed, enemy[index]);
 }
+
+// Function for choosing a random, valid location to spawn an enemy. The parameter is a 2D array holding the possible spawn points.
+function enemySpawnLocation(possibleLocations) {
+  let locationFound = false;
+  let index;
+// While loop will check a random spawn location from the possibleLocations array and check it for validity until a valid spawn location is found.
+  while(!locationFound) {
+    locationFound = true;
+    index = 0; // Will be replaced with a random number later.
+    for(let i=0; i<possibleLocations[index].length; i++) {
+      const x = possibleLocations[index][i][0];
+      const y = possibleLocations[index][i][1];
+      if(
+        game.grid[x][y].enemyOccupied !== -1 ||
+        game.grid[x][y].playerOccupied === true ||
+        game.grid[x][y].debrisOccupied !== -1 ||
+        game.grid[x][y].playerLaserOccupied !== -1 ||
+        game.grid[x][y].enemyLaserOccupied !== -1
+        ){
+        locationFound = false;
+      }
+    }
+  }
+  return possibleLocations[index];
+}
+
 
 function move(direction, location, renderColor) {
   render(true,location,game.bgColor); // Undraws the current location
@@ -151,6 +192,18 @@ function move(direction, location, renderColor) {
 
   }
   render(false,location,renderColor); // Draws the updated location
+}
+
+// Function for rendering. 
+function render(undraw, location, renderColor) {
+  if(undraw === true) {
+    renderColor = game.bgColor;
+  }
+  for(let i=0; i<location.length; i++) {
+    const x = location[i][0];
+    const y = location[i][1];
+    game.grid[x][y].element.style.backgroundColor = renderColor;
+  }
 }
 
 function gridUpdate(type, location, index, remove) {
@@ -181,17 +234,29 @@ function gridUpdate(type, location, index, remove) {
           game.grid[x][y].playerLaserOccupied = index;
         }
       break;
+
+      case "enemyLaser":
+        if(remove) {
+          game.grid[x][y].enemyLaserOccupied = -1;
+        } else if(!remove) {
+          game.grid[x][y].enemyLaserOccupied = index;
+        }
       }
   }
 }
 
-function edgeDetect(direction, location) {
+// Function for checking for invalid movements based on entityType (player or enemy).
+function invalidMovement(direction, location, isEnemy) {
   for (let i = 0; i < location.length; i++) {
-    if ((direction === "left" && location[i][0] <= 0) ||
-      (direction === "right" && location[i][0] >= game.maxCols - 1) ||
-      (direction === "down" && location[i][1] >= game.maxRows - 1) ||
-      (direction === "up" && location[i][1] <= 0))    
-    {
+    const x = location[i][0];
+    const y = location[i][1];
+    if (
+      (direction === "left" && x <= 0) ||
+      (direction === "right" && x >= game.maxCols - 1) ||
+      (direction === "down" && y >= game.maxRows - 1) ||
+      (direction === "up" && y <= 0) ||
+      (direction === "down" && isEnemy === true && y === game.enemyBoundary) // Prevents the enemies from going below the row that was set in game.enemyBoundary
+    ){
       return true;
     }
   }
@@ -221,9 +286,9 @@ function shootLaser(entity) {
   }
   // Adjust the spawn location for the laser depending on whether it's a player laser or enemy laser.
   if(entity.type === "player") {
-    entity.lasers[index].location = [[x,y-1],[x+1,y-1],[x,y-2],[x+1,y-2],[x,y-3],[x+1,y-3]];
+    entity.lasers[index].location = [[x,y-1],[x,y-2],[x,y-3]];
   } else if (entity.type === "enemy") {
-    entity.lasers[index].location = [[x,y-1],[x+1,y-1],[x,y-2],[x+1,y-2],[x,y-3],[x+1,y-3]]; // <-- Change later
+    entity.lasers[index].location = [[x,y+1],[x,y+2],[x,y+3]];
   }
   render(false, entity.lasers[index].location, entity.laserColor);
   entity.lasers[index].moveInterval = setInterval(moveLaser, entity.laserSpeed, entity.lasers[index]);
@@ -238,17 +303,17 @@ function moveLaser(laserObject) {
   const index = laserObject.index;
   let direction;
   let friendOrFoe;
-  // Determine how the grid is updated and how the laser moved based on the entity that shot the laser.
+  // Determine how the grid is updated and how the laser moves based on the entity that shot the laser.
   if(laserObject.type === "player") {
     friendOrFoe = "playerLaser";
     direction = "up";
   } else if(laserObject.type === "enemy") {
-     friendOrFoe = "playerLaser";
-     direction = "up";
+     friendOrFoe = "enemyLaser";
+     direction = "down";
   }
   // check last index for being on row 0 and if it is, destroy laser, alternatively, do this in the collision checker for lasers
   gridUpdate(friendOrFoe, location, index, true); // Removes laser data from cells
-  move(direction, location, player.laserColor); // Moves and renders the new location
+  move(direction, location, laserObject.color); // Moves and renders the new location
   gridUpdate(friendOrFoe, location, index, false); // Adds the laser data to the new cells
   laserCollision(laserObject);
 }
@@ -264,7 +329,7 @@ function laserCollision(laserObject) {
     if(laserObject.location[i][1] <= 0) {
       destroy = true;
     // If a laser hits the bottom edge, destroy it
-    } else if(laserObject.location[i][0] >= game.maxRows-1) {
+    } else if(laserObject.location[i][1] >= game.maxRows-1) {
       destroy = true;
     }
   }
@@ -275,8 +340,8 @@ function laserCollision(laserObject) {
 
 // Function for removing lasers from the game once they've collided with something.
 function destroyLaser(laserObject) {
-  let friendOrFoe;
-  let laserArray;
+  let friendOrFoe; // Tells us how to update the grid information
+  let laserArray; // References the correct laser array (player or enemy) so we can remove this laser from it
   let location = laserObject.location;
   let index = laserObject.index;
   clearInterval(laserObject.moveInterval); // Stops the interval related to this laser.
