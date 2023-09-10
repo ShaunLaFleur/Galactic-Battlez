@@ -1,0 +1,102 @@
+body {
+  font-family: 'Kdam Thmor Pro';font-size: 15px;
+  text-align:center;
+  background: linear-gradient(179deg, #394373 0%, #394373 23%, #000000 100%, #020202 100%);
+}
+
+#grid {
+  width: 600px;
+  height: 600px;
+  float: left;
+  margin-right: 0px;
+}
+
+#container {
+  display: inline-block;
+  background: rgba( 255, 255, 255, 0.2 );
+  box-shadow: 0 8px 32px 0 rgba( 31, 38, 135, 0.37 );
+  backdrop-filter: blur( 1px );
+  -webkit-backdrop-filter: blur( 1px );
+  border-radius: 10px;
+  border: 1px solid rgba( 255, 255, 255, 0.18 );
+}
+
+#rules {
+  float:left;  
+  border: 5px solid white;
+  width: 500px;
+  min-height: 398px;
+  margin-right: 20px;
+  background-color: white;
+}
+
+ul {
+  text-align: left;
+  list-style: none;
+}
+
+li {
+  margin-bottom: 10px;
+  border-bottom: 1px solid #e6e5e5;
+}
+
+#title {
+  color: white;
+  margin-bottom: 0px;
+  margin-top:2px;
+}
+
+#grid {
+  background: rgba( 255, 255, 255, 0.2 );
+  box-shadow: 0 8px 32px 0 rgba( 31, 38, 135, 0.37 );
+  backdrop-filter: blur( 6.5px );
+  -webkit-backdrop-filter: blur( 6.5px );
+  border-radius: 1px;
+  border: 1px solid rgba( 255, 255, 255, 0.18 );
+  margin-bottom:5px;
+  margin-left:5px;
+  margin-right:5px;
+}
+
+#score {
+  color: white;
+}
+
+p {
+  color: white;
+  margin-top: 5px;
+}
+
+
+
+button {
+	box-shadow:inset 0px 1px 3px 0px #91b8b3;
+	background:linear-gradient(to bottom, #3b3d3d 5%, #191b1b 100%);
+	background-color:#000000;
+	border-radius:5px;
+	border:1px solid #ffffff;
+	display:inline-block;
+	cursor:pointer;
+	color:#ffffff;
+	padding:11px 23px;
+	text-decoration:none;
+	text-shadow:0px -1px 0px #2b665e;
+  margin-bottom:10px;
+  margin-top: 2px;
+}
+button:hover {
+	background:linear-gradient(to bottom, #6c7c7c 5%, #768d87 100%);
+	background-color:#6c7c7c;
+}
+button:active {
+	position:relative;
+	top:1px;
+}
+
+.cell {
+  width: 6px;
+  height: 6px;
+  background: rgba(0, 0, 0, 0.85);
+ box-shadow: 0 8px 32px 0 rgba( 31, 38, 135, 0.37 );
+  float: left;
+}
