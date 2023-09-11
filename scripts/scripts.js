@@ -6,39 +6,54 @@ const game = {
   enemyLasers:[], // Each index holds an object with the location of each enemy laser as it moves as well as the ID to it's interval and other important data
   grid:[], // Will hold a 2D grid array that contains important information such as whether each cell is occupied by a player or enemy object. First index is x coordinate that holds another array that's index is the y coordinate that holds the object data. So game.grid[1][2] holds the object for the cell at coordinates x:1, y:2.
   playerDefault: { // Player defaults so when the game starts we can clone this object and spawn the player.
+    name:"User",
     health: 200,
     movement: { speed: 20, distance: 2 },
     location:[[48,87],[47,88],[48,88],[49,88],[46,89],[47,89],[48,89],[49,89],[50,89],[46,90],[47,90],[49,90],[50,90],[46,91],[50,91]],
-    deathLocation:[], // Used to render a short animation
-    lasers:[], // Each index holds an object with the location of each player laser as it moves as well as the ID to it's interval and other important data
-    laserSpeed:25, // Lower is faster
-    laserColor:"laser", // The name of the CSS color class.
-    laserDamage:10,
+    laserProperties:{ // Holds the laser properties so when a new laser object is created it can inherit the properties.
+      lasers:[], // Each index holds an object with the location of each player laser as it moves as well as the ID to it's interval and other important data
+      laserCount:0, // Holds the current amount of lasers being fired
+      laserMax:1, // How many lasers can be fired at once.
+      speed:25, // Lower is faster
+      color:"laser", // The name of the CSS color class.
+      damage:10,
+      type:"playerLaser",
+      direction:"up"
+    },
     color:"player", // The name of the CSS color class.
     type:"player",
+    faction:"player",
   },
   enemyTypes: [
     { // Start of enemy type 1 object
+    name:"EnemyTypeOne",
     health: 100,
-    movement: { speed: 100, distance: 1 },
+    movement: { speed: 200, distance: 2 },
     location:[], // Each array position is a segment (cell) of the enemy on the grid that contains it's x,y coordinates. So Location[0][0] = x coordinate of segment 0 and Location[0][1] is the y coordinate of segment 0.
     moveInterval:0, // Stores this enemy's moving interaval ID
     attackInterval:0, // stores this enemy's atacking interval ID
-    index:-1, // An index that we use to store on the grid cells that it occupies so we can reference this instance of object during collisions.
-    lasers:[], // Initiated to later store a reference to the enemy.lasers array.
-    laserSpeed:15, // How fast the laser moves across the grid.
     attackSpeed:1500, // How often a laser is fired.
-    laserDamage:5, // The amount of damage done to the player if the laser hits.
-    laserColor:"enemy", // The name of the CSS color class.
+    index:-1, // An index that we use to store on the grid cells that it occupies so we can reference this instance of object during collisions.
+    laserProperties: {
+      lasers:[], // Initiated to later store a reference to the enemy.lasers array.
+      laserCount:0, // Holds the current amount of lasers being fired
+      laserMax:1, // How many lasers can be fired at once.
+      speed:15, // How fast the laser moves across the grid.
+      damage:5, // The amount of damage done to the player if the laser hits.
+      color:"enemy", // The name of the CSS color class.
+      type:"enemyLaser",
+      direction:"down",
+    },
     color:"enemy", // The name of the CSS color class.
-    type:"enemy", // Used to help modularize functions based on object
+    type:"enemy",
+    faction:"enemy", // Used to help modularize functions based on object
     movementPatterns: { // Stores the AI movement patterns in a 2D array. One pattern is played out at a time at random.
       patterns: [
-        ["left", "left", "left", "right", "down", "left", "up", "left", "right", "down", "up", "up", "left", "right", "down"],
+        ["left", "left", "left", "right", "down", "left", "up", "right", "right", "down", "up", "up", "left", "right", "down"],
         ["left", "left", "left", "right", "up", "up", "left", "left", "right", "down", "left", "left", "left", "right", "down"],
         ["right", "right", "right", "left", "down", "right", "right", "right", "left", "down", "right", "right", "right", "left", "down"],
         ["left", "left", "up", "right", "down", "down", "down", "down", "down", "down", "left", "left", "right", "up", "up"],
-        ["left","right","up","up","up","up","up","up","up","right","right","left","up","up","up"]
+        ["left","right","up","up","right","up","right","up","up","right","right","left","up","up","up"]
       ],
       patternIndex: 0, // Keeps track of which pattern is currently active.
       stepIndex: 0, // Keeps track of which step of the pattern the enemy is acting out.
@@ -84,7 +99,7 @@ function generateGrid() {
         playerLaserOccupied:-1, // Refers to the index of the laser array for the laser object that occupies this location. Used for laser collision.
         enemyLaserOccupied:-1, // Refers to the index of the enemy laser array for the laser object that occupies this location. Used for laser collision.
         element:elem, // Stores a reference to it's respective DIV element for easier manipulation later.
-        color:"rgba(0, 0, 0, 0.85)", // start with background color, this is currently only for dev testing
+        colored:false, // start with background color, this is currently only for dev testing
       });
     }
   }
@@ -106,9 +121,9 @@ document.addEventListener("keydown", event => {
       direction = "up";
     }
     if(direction !== "none") {
-      gridUpdate("player",player.location,-1,true); // Removes current location from the cell data.
+      gridUpdate(player.type,player.location,-1,true); // Removes current location from the cell data.
       move(direction,player); // Moves the object by undrawing, updating coordinates and then redrawing
-      gridUpdate("player",player.location,-1,false); // Adds the new updated location to the cell data.
+      gridUpdate(player.type,player.location,-1,false); // Adds the new updated location to the cell data.
     }
   }
 });
@@ -117,12 +132,13 @@ document.addEventListener("keydown", event => {
 function devTool(element) {
   const x = element.getAttribute("data-x");
   const y = element.getAttribute("data-y");
-  if(game.grid[x][y].color === game.bgColor) {
-    element.style.backgroundColor = "white";
-    game.grid[x][y].color = "white";
+  // change this to work with css classes
+  if(!game.grid[x][y].colored) {
+    element.classList.add("player");
+    game.grid[x][y].colored = true;
   } else {
-    element.style.backgroundColor = game.bgColor;
-    game.grid[x][y].color = game.bgColor;
+    element.classList.remove("player");
+    game.grid[x][y].colored = false;
   }
   console.log(`Grid position X: ${x}, Y: ${y}`);
   console.log(game.grid[x][y]);
@@ -131,17 +147,8 @@ function devTool(element) {
 function gameStart() {
   game.started = true;
   player = structuredClone(game.playerDefault);
-  console.log(player);
-  spawnPlayer();
-}
-
-function spawnPlayer(){
   render(false,player.location,player.color);
-  for(let i=0; i<player.location.length; i++) {
-    const x = player.location[i][0];
-    const y = player.location[i][1];
-    game.grid[x][y].playerOccupied = true;
-  }
+  gridUpdate(player.type,player.location,-1,false);
 }
 
 // Enemy spawning logic.
@@ -157,9 +164,9 @@ function spawnEnemy() {
   max = enemy[index].movementPatterns.patterns.length-1; // Sets the maximum number that can be randomly generated to the last index of the patterns array.
   enemy[index].movementPatterns.currentPattern = Math.floor(Math.random()*((max+1)-0)+0); // Sets a random movement pattern to the active one.
   enemy[index].index = index; // Stores the index the object occupies in the enemy array as a property in the object
-  enemy[index].lasers = game.enemyLasers; // Makes the enemy[index].lasers property reference the game.enemyLasers array so we can store ALL enemy lasers in the same array.
+  enemy[index].laserProperties.lasers = game.enemyLasers; // Makes the enemy[index].laserProperty.lasers property reference the game.enemyLasers array so we can store ALL enemy lasers in the same array.
   enemy[index].location = enemySpawnLocation(enemy[index].spawnLocations); // Calls the function to choose a random, valid spawn location and sets its returned value as the location.
-  gridUpdate("enemy", enemy[index].location, index, false); // Update the grid cells the enemy occupies
+  gridUpdate(enemy[index].type, enemy[index].location, index, false); // Update the grid cells the enemy occupies
   render(false, enemy[index].location, enemy[index].color); // Renders the enemy object on the board.
   enemy[index].attackInterval = setInterval(shootLaser, enemy[index].attackSpeed, enemy[index]); // Starts the attack interval for this enemy
   enemy[index].moveInterval = setInterval(enemyMovement, enemy[index].movement.speed, enemy[index]); // Starts the moving interval for this enemy
@@ -226,7 +233,6 @@ function move(direction,entity) {
     } else if(direction === "right") {
       location[i][0] += moveDistance;
     }
-
   }
   render(false,location,renderColor); // Draws the updated location
 }
@@ -304,58 +310,70 @@ function invalidLocation(direction, location, adjustment, isEnemy) {
 
 // Modular function for creating lasers when they are shot by either a player or enemy object. The parameter is for the originating object so we can get properties off of the object that fires the laser and determine how to draw and store the laser.
 function shootLaser(entity) {
-  // place an if (player.laserCooldown is false && entity.type is player) OR entity.type is "enemy" here and encapsulate everything below
   let index;
   const x = entity.location[0][0]; // Sets the x coordinate for the first piece of the object for reference when calculating laser spawn point.
   const y = entity.location[0][1]; // Sets the y coordinate for the first piece of the object for reference when calculating laser spawn point.
-  if(entity.lasers.length === 0) { // If the array is empty, set the index to 0.
+  if(entity.laserProperties.lasers.length === 0) { // If the array is empty, set the index to 0.
     index = 0;
-  } else if(entity.lasers.indexOf(null) !== -1) { // if null is found, set the index to the first null index found.
-    index = entity.lasers.indexOf(null);
+  } else if(entity.laserProperties.lasers.indexOf(null) !== -1) { // if null is found, set the index to the first null index found.
+    index = entity.laserProperties.lasers.indexOf(null);
   } else { // otherwise if there are no null indexes and the array isn't empty, we set the index to the first uninitiated index
-    index = entity.lasers.length;
+    index = entity.laserProperties.lasers.length;
   }
-  // Create the new laser object in it's respective array with it's respective properties based on the object that shot it.
-  entity.lasers[index] = {
-    index:index,
-    color:entity.laserColor,
-    type:entity.type,
-    movement: {speed: entity.laserSpeed, distance: 1},
-    moveInterval:null,
-    damage:entity.laserDamage,
+  // Create the new laser object in it's respective array at index "index" with it's respective properties based on the object that shot it.
+  entity.laserProperties.lasers[index] = {
+    index: index,
+    color: entity.laserProperties.color,
+    faction: entity.faction,
+    movement: {speed: entity.laserProperties.speed, distance: 1},
+    moveInterval: null,
+    damage: entity.laserProperties.damage,
+    lasersArray: entity.laserProperties.lasers, // Stores a reference to the corresponding array this laser exists in
+    direction: entity.laserProperties.direction,
+    type: entity.laserProperties.type,
   }
-  // set location to the location we'd need to spawn the laser then we use invalidLocation check
   // Adjust the spawn location for the laser depending on whether it's a player laser or enemy laser.
-  if(entity.type === "player") {
-    entity.lasers[index].location = [[x,y-1],[x,y-2],[x,y-3]];
-  } else if (entity.type === "enemy") {
-    entity.lasers[index].location = [[x,y+1],[x,y+2],[x,y+3]];
+  if(entity.faction === "player") {
+    entity.laserProperties.lasers[index].location = [[x,y-1],[x,y-2],[x,y-3]];
+  } else if (entity.faction === "enemy") {
+    entity.laserProperties.lasers[index].location = [[x,y+1],[x,y+2],[x,y+3]];
   }
-  render(false, entity.lasers[index].location, entity.laserColor);
-  entity.lasers[index].moveInterval = setInterval(moveLaser, entity.laserSpeed, entity.lasers[index]);
-  // set player.laserCooldown = true here
-  // add await here that resets player.laserCooldown to false
-  // set player.laserCooldown to false after the await
+  render(false, entity.laserProperties.lasers[index].location, entity.laserProperties.color);
+  entity.laserProperties.lasers[index].moveInterval = setInterval(moveLaser, entity.laserProperties.speed, entity.laserProperties.lasers[index]);
+  // Check if more lasers need to be fired in the case of objects that fire multiple at once.
+  entity.laserProperties.laserCount++;
+  if(entity.laserProperties.laserCount === entity.laserProperties.laserMax) {
+    entity.laserProperties.laserCount = 0;
+  } else {
+    shootLaser(entity); // If max lasers haven't been shot then calls the shoot laser function again to shoot another.
+  }
+}
+
+function laserSpawnLocation(entity) {
+  const entityName = entity.Name
+  switch(entityName) {
+    case "User":
+      break;
+
+    case "EnemyTypeOne":
+      break;
+
+    case "EnemyTypeTwo":
+      break;
+  }
+
 }
 
 // probably pass entire laser object here instead of location parameter so we can get values related to whether it's an enemy or player
 function moveLaser(laserObject) {
   const location = laserObject.location;
   const index = laserObject.index;
-  let direction;
-  let friendOrFoe;
-  // Determine how the grid is updated and how the laser moves based on the entity that shot the laser.
-  if(laserObject.type === "player") {
-    friendOrFoe = "playerLaser";
-    direction = "up";
-  } else if(laserObject.type === "enemy") {
-     friendOrFoe = "enemyLaser";
-     direction = "down";
-  }
+  const direction = laserObject.direction;
+  const type = laserObject.type;
   // check last index for being on row 0 and if it is, destroy laser, alternatively, do this in the collision checker for lasers
-  gridUpdate(friendOrFoe, location, index, true); // Removes laser data from cells
+  gridUpdate(type, location, index, true); // Removes laser data from cells
   move(direction, laserObject); // Moves and renders the new location
-  gridUpdate(friendOrFoe, location, index, false); // Adds the laser data to the new cells
+  gridUpdate(type, location, index, false); // Adds the laser data to the new cells
   laserCollision(laserObject);
 }
 
@@ -375,29 +393,20 @@ function laserCollision(laserObject) {
     }
   }
   if(destroy) {
-    console.log(`Destroy triggered on ${laserObject}`);
     destroyLaser(laserObject);
   }
 }
 
 // Function for removing lasers from the game once they've collided with something.
 function destroyLaser(laserObject) {
-  console.log(`Called to destroy laser ${laserObject}`);
-  let friendOrFoe; // Tells us how to update the grid information
-  let laserArray; // References the correct laser array (player or enemy) so we can remove this laser from it
   const location = laserObject.location;
   const index = laserObject.index;
+  const type = laserObject.type;
+  const lasersArray = laserObject.lasersArray;
   clearInterval(laserObject.moveInterval); // Stops the interval related to this laser.
-  if(laserObject.type === "player") {
-    friendOrFoe = "playerLaser";
-    laserArray = player.lasers;
-  } else if(laserObject.type === "enemy") {
-    friendOrFoe = "enemyLaser";
-    laserArray = game.enemyLasers;
-  }
-  gridUpdate(friendOrFoe, location, index, true); // Remove the laser data from the grid array.
+  gridUpdate(type, location, index, true); // Remove the laser data from the grid array.
   render(true, location, laserObject.color); // Undraw the laser.
-  laserArray[index] = null; // Set the laser's respective array index to null to remove it.
+  lasersArray[index] = null; // Set the laser's respective array index to null to remove it.
 }
 
 function playerCollisions(gameObject) {
