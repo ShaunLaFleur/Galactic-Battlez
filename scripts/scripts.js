@@ -1,7 +1,6 @@
 const game = {
   maxRows: 100,
   maxCols: 100,
-  bgColor:"rgba(0, 0, 0, 0.85)",
   started: false,
   enemyBoundary:36, // The row that the enemy will never go below.
   enemyLasers:[], // Each index holds an object with the location of each enemy laser as it moves as well as the ID to it's interval and other important data
@@ -13,9 +12,9 @@ const game = {
     deathLocation:[], // Used to render a short animation
     lasers:[], // Each index holds an object with the location of each player laser as it moves as well as the ID to it's interval and other important data
     laserSpeed:25, // Lower is faster
-    laserColor:"green",
+    laserColor:"laser", // The name of the CSS color class.
     laserDamage:10,
-    color:"white",
+    color:"player", // The name of the CSS color class.
     type:"player",
   },
   enemyTypes: [
@@ -30,8 +29,8 @@ const game = {
     laserSpeed:15, // How fast the laser moves across the grid.
     attackSpeed:1500, // How often a laser is fired.
     laserDamage:5, // The amount of damage done to the player if the laser hits.
-    laserColor:"red",
-    color:"red",
+    laserColor:"enemy", // The name of the CSS color class.
+    color:"enemy", // The name of the CSS color class.
     type:"enemy", // Used to help modularize functions based on object
     movementPatterns: { // Stores the AI movement patterns in a 2D array. One pattern is played out at a time at random.
       patterns: [
@@ -216,7 +215,7 @@ function move(direction,entity) {
   const location = entity.location;
   const renderColor = entity.color;
   const moveDistance = entity.movement.distance;
-  render(true,location,game.bgColor); // Undraws the current location
+  render(true,location,entity.color); // Undraws the current location
   for(let i=0; i<location.length; i++) {
     if(direction === "up") {
       location[i][1] -= moveDistance;
@@ -232,15 +231,16 @@ function move(direction,entity) {
   render(false,location,renderColor); // Draws the updated location
 }
 
-// Function for rendering. 
+// Function for rendering. Adds and removes css classes for the rendering.
 function render(undraw, location, renderColor) {
-  if(undraw === true) {
-    renderColor = game.bgColor;
-  }
   for(let i=0; i<location.length; i++) {
     const x = location[i][0];
     const y = location[i][1];
-    game.grid[x][y].element.style.backgroundColor = renderColor;
+    if(undraw === true) {
+      game.grid[x][y].element.classList.remove(renderColor);
+    } else {
+      game.grid[x][y].element.classList.add(renderColor);
+    }
   }
 }
 
@@ -396,7 +396,7 @@ function destroyLaser(laserObject) {
     laserArray = game.enemyLasers;
   }
   gridUpdate(friendOrFoe, location, index, true); // Remove the laser data from the grid array.
-  render(true, location, game.bgColor); // Undraw the laser.
+  render(true, location, laserObject.color); // Undraw the laser.
   laserArray[index] = null; // Set the laser's respective array index to null to remove it.
 }
 
