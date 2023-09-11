@@ -12,7 +12,7 @@ const game = {
     location:[[48,87],[47,88],[48,88],[49,88],[46,89],[47,89],[48,89],[49,89],[50,89],[46,90],[47,90],[49,90],[50,90],[46,91],[50,91]],
     deathLocation:[], // Used to render a short animation
     lasers:[], // Each index holds an object with the location of each player laser as it moves as well as the ID to it's interval and other important data
-    laserSpeed:35, // Lower is faster
+    laserSpeed:25, // Lower is faster
     laserColor:"green",
     laserDamage:10,
     color:"white",
@@ -21,29 +21,36 @@ const game = {
   enemyTypes: [
     { // Start of enemy type 1 object
     health: 100,
-    movement: { speed: 20, distance: 1 },
+    movement: { speed: 100, distance: 1 },
     location:[], // Each array position is a segment (cell) of the enemy on the grid that contains it's x,y coordinates. So Location[0][0] = x coordinate of segment 0 and Location[0][1] is the y coordinate of segment 0.
     moveInterval:0, // Stores this enemy's moving interaval ID
     attackInterval:0, // stores this enemy's atacking interval ID
     index:-1, // An index that we use to store on the grid cells that it occupies so we can reference this instance of object during collisions.
     lasers:[], // Initiated to later store a reference to the enemy.lasers array.
-    laserSpeed:35, // How fast the laser moves across the grid.
-    attackSpeed:1000, // How often a laser is fired.
+    laserSpeed:15, // How fast the laser moves across the grid.
+    attackSpeed:1500, // How often a laser is fired.
     laserDamage:5, // The amount of damage done to the player if the laser hits.
     laserColor:"red",
     color:"red",
     type:"enemy", // Used to help modularize functions based on object
     movementPatterns: { // Stores the AI movement patterns in a 2D array. One pattern is played out at a time at random.
       patterns: [
-        ["left", "left", "left", "right", "down", "left", "left", "left", "right", "down", "left", "left", "left", "right", "down"],
-        ["left", "left", "left", "right", "down", "left", "left", "left", "right", "down", "left", "left", "left", "right", "down"],
-        ["right", "right", "right", "left", "down", "right", "right", "right", "left", "down", "right", "right", "right", "left", "down"]
+        ["left", "left", "left", "right", "down", "left", "up", "left", "right", "down", "up", "up", "left", "right", "down"],
+        ["left", "left", "left", "right", "up", "up", "left", "left", "right", "down", "left", "left", "left", "right", "down"],
+        ["right", "right", "right", "left", "down", "right", "right", "right", "left", "down", "right", "right", "right", "left", "down"],
+        ["left", "left", "up", "right", "down", "down", "down", "down", "down", "down", "left", "left", "right", "up", "up"],
+        ["left","right","up","up","up","up","up","up","up","right","right","left","up","up","up"]
       ],
-      currentPattern: 0, // Keeps track of which pattern is currently active.
-      currentIndex: 0, // Keeps track of which part of the pattern the enemy is acting out.
+      patternIndex: 0, // Keeps track of which pattern is currently active.
+      stepIndex: 0, // Keeps track of which step of the pattern the enemy is acting out.
     },
     spawnLocations: [ // A 2D array storing all possible spawn positions/locations.
-      [[44,5],[41,4],[42,4],[43,4],[44,4],[45,4],[46,4],[47,4],[46,3],[45,3],[44,3],[43,3],[42,3],[43,2],[43,1],[42,1],[45,2],[45,1],[46,1]] // Spawn location 1 (index 0)
+      [[44,5],[41,4],[42,4],[43,4],[44,4],[45,4],[46,4],[47,4],[46,3],[45,3],[44,3],[43,3],[42,3],[43,2],[43,1],[42,1],[45,2],[45,1],[46,1]],
+      [[44,15],[41,14],[42,14],[43,14],[44,14],[45,14],[46,14],[47,14],[46,13],[45,13],[44,13],[43,13],[42,13],[43,12],[43,11],[42,11],[45,12],[45,11],[46,11]],
+      [[34,15],[31,14],[32,14],[33,14],[34,14],[35,14],[36,14],[37,14],[36,13],[35,13],[34,13],[33,13],[32,13],[33,12],[33,11],[32,11],[35,12],[35,11],[36,11]],
+      [[54,15],[51,14],[52,14],[53,14],[54,14],[55,14],[56,14],[57,14],[56,13],[55,13],[54,13],[53,13],[52,13],[53,12],[53,11],[52,11],[55,12],[55,11],[56,11]],
+      [[74,5],[71,4],[72,4],[73,4],[74,4],[75,4],[76,4],[77,4],[76,3],[75,3],[74,3],[73,3],[72,3],[73,2],[73,1],[72,1],[75,2],[75,1],[76,1]],
+      [[14,5],[11,4],[12,4],[13,4],[14,4],[15,4],[16,4],[17,4],[16,3],[15,3],[14,3],[13,3],[12,3],[13,2],[13,1],[12,1],[15,2],[15,1],[16,1]]
     ]
     }, // End of enemy type 1 object
   ],
@@ -140,34 +147,34 @@ function spawnPlayer(){
 
 // Enemy spawning logic.
 function spawnEnemy() {
+  let max;
   if(enemy.indexOf(null) === -1) {
     return; // return and avoid spawning an enemy since there are no empty slots available for an enemy spawn
   }
   const index = enemy.indexOf(null); // Sets the index to the first available spot in the enemy array
-  const randomEnemy = 0; // "0" will be replaced with a random number generator to choose an enemy type. For now we only have one enemy type.
-  switch(chosenType) {
-    case 1:
-      enemy[index] = structuredClone(game.enemyTypes[randomEnemy]); // Copies the respective enemy type's default object properties
-      break;
-  }
-  console.log(enemy);
+  max = game.enemyTypes.length-1; // Sets the maximum number that can be randomly generated to the last index of the enemyTypes array.
+  const randomEnemyIndex = Math.floor(Math.random()*((max+1)-0)+0); // Generates a random index to copy from the enemy.enemyTypes array, effectively choosing a random enemy type to spawn.
+  enemy[index] = structuredClone(game.enemyTypes[randomEnemyIndex]); // Copies the chosen enemy type's default object properties
+  max = enemy[index].movementPatterns.patterns.length-1; // Sets the maximum number that can be randomly generated to the last index of the patterns array.
+  enemy[index].movementPatterns.currentPattern = Math.floor(Math.random()*((max+1)-0)+0); // Sets a random movement pattern to the active one.
   enemy[index].index = index; // Stores the index the object occupies in the enemy array as a property in the object
   enemy[index].lasers = game.enemyLasers; // Makes the enemy[index].lasers property reference the game.enemyLasers array so we can store ALL enemy lasers in the same array.
   enemy[index].location = enemySpawnLocation(enemy[index].spawnLocations); // Calls the function to choose a random, valid spawn location and sets its returned value as the location.
   gridUpdate("enemy", enemy[index].location, index, false); // Update the grid cells the enemy occupies
   render(false, enemy[index].location, enemy[index].color); // Renders the enemy object on the board.
   enemy[index].attackInterval = setInterval(shootLaser, enemy[index].attackSpeed, enemy[index]); // Starts the attack interval for this enemy
-  // start the movement interval. call a function that will handle iterating through the movement patterns, send the enemy object as a parameter
+  enemy[index].moveInterval = setInterval(enemyMovement, enemy[index].movement.speed, enemy[index]); // Starts the moving interval for this enemy
 }
 
 // Function for choosing a random, valid location to spawn an enemy. The parameter is a 2D array holding the possible spawn points.
 function enemySpawnLocation(possibleLocations) {
   let locationFound = false;
   let index;
+  const max = possibleLocations.length-1; // Sets the maximum number that can be randomly generated to match the last index of the possibleLocations array.
 // While loop will check a random spawn location from the possibleLocations array and check it for validity until a valid spawn location is found.
   while(!locationFound) {
     locationFound = true;
-    index = 0; // Will be replaced with a random number later.
+    index = Math.floor(Math.random()*((max+1)-0)+0);
     for(let i=0; i<possibleLocations[index].length; i++) {
       const x = possibleLocations[index][i][0];
       const y = possibleLocations[index][i][1];
@@ -186,7 +193,22 @@ function enemySpawnLocation(possibleLocations) {
 }
 
 function enemyMovement(enemyEntity) {
-  // logic for iterating randomly through movement patterns and then executing them repeatedly
+  const patterns = enemyEntity.movementPatterns.patterns;
+  const max = patterns.length-1; // Sets max to the last index of the patterns array
+  const patternIndex = enemyEntity.movementPatterns.patternIndex;
+  const stepIndex = enemyEntity.movementPatterns.stepIndex;
+  let direction = patterns[patternIndex][stepIndex];
+  if(!invalidLocation(direction, enemyEntity.location, enemyEntity.movement.distance, true)) {
+    gridUpdate("enemy", enemyEntity.location, enemyEntity.index, true); // Removes current location data from the grid.
+    move(direction, enemyEntity); // Move and re-render object
+    gridUpdate("enemy", enemyEntity.location, enemyEntity.index, false); // Update location data on the grid
+  }
+  if(stepIndex === patterns[patternIndex].length-1) {
+    enemyEntity.movementPatterns.stepIndex = 0;
+    enemyEntity.movementPatterns.patternIndex = Math.floor(Math.random()*((max+1)-0)+0);
+  } else {
+    enemyEntity.movementPatterns.stepIndex++;
+  }
 }
 
 // Function for moving and rendering objects on the board. moveDistance is how many cells each movement jumps per movement update.
@@ -363,8 +385,8 @@ function destroyLaser(laserObject) {
   console.log(`Called to destroy laser ${laserObject}`);
   let friendOrFoe; // Tells us how to update the grid information
   let laserArray; // References the correct laser array (player or enemy) so we can remove this laser from it
-  let location = laserObject.location;
-  let index = laserObject.index;
+  const location = laserObject.location;
+  const index = laserObject.index;
   clearInterval(laserObject.moveInterval); // Stops the interval related to this laser.
   if(laserObject.type === "player") {
     friendOrFoe = "playerLaser";
