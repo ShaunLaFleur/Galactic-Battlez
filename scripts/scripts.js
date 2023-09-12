@@ -42,6 +42,10 @@ const enemyData = {
     ],
   }
 }
+const debrisData = {
+  debrisArray:[null, null, null],
+  spawnLocations:[],
+}
 const game = {
   maxRows: 100,
   maxCols: 100,
@@ -50,7 +54,7 @@ const game = {
   enemyLasers: [], // Each index holds an object with the location of each enemy laser as it moves as well as the ID to it's interval and other important data
   grid: [], // Will hold a 2D grid array that contains important information such as whether each cell is occupied by a player or enemy object. First index is x coordinate that holds another array that's index is the y coordinate that holds the object data. So game.grid[1][2] holds the object for the cell at coordinates x:1, y:2.
   debris: [null, null, null],
-  playerDefault: { // Player defaults so when the game starts we can clone this object and spawn the player.
+  playerDefaults: { // Player defaults so when the game starts we can clone this object and spawn the player.
     name:"User",
     health: 200,
     movement: { speed: 20, distance: 2 },
@@ -72,7 +76,7 @@ const game = {
     gridParameter:"playerOccupied",
     index: 1,
   },
-  enemyTypes: [
+  enemyDefaults: [
     { // Start of enemy type 1 object
     name:"EnemyTypeOne",
     health: 100,
@@ -97,7 +101,7 @@ const game = {
     color:"enemy", // The name of the CSS color class.
     gridParameter:"enemyOccupied",
     movementPatterns: {
-      patterns: enemyData.typeOne.movementPatterns, // Sets a reference to the enemie's movement pattern array so we don't have to copy it when we copy these default settings.
+      patterns: [], // Sets a reference to the enemie's movement pattern array so we don't have to copy it when we copy these default settings.
       patternIndex: 0, // Keeps track of which pattern is currently active.
       stepIndex: 0, // Keeps track of which step of the pattern the enemy is acting out.
     },
@@ -122,18 +126,27 @@ const game = {
         direction:"down",
         index:-1,
         movement: {speed: 2, distance: 1},
-        moveIntervall: null,
+        moveInterval: null,
       },
       color:"enemy", // The name of the CSS color class.
       gridParameter:"enemyOccupied",
       movementPatterns: { // Stores the AI movement patterns in a 2D array. One pattern is played out at a time at random.
-        patterns: enemyData.typeTwo.movementPatterns,
+        patterns: [],
         patternIndex: 0, // Keeps track of which pattern is currently active.
         stepIndex: 0, // Keeps track of which step of the pattern the enemy is acting out.
       },
       spawnLocations: enemyData.typeTwo.spawnLocations,
       }, // End of enemy type 2 object
   ],
+  debrisDefaults: {
+    health:20,
+    damage:100,
+    movement:{speed:20, distance:1},
+    debrisArray: debrisData.debrisArray,
+    gridParameter: "debrisOccupied",
+    index:-1,
+    moveInterval: null,
+  }
 }
 let player = {}; // the object that will hold the player data
 let enemy = [null, null, null] // Each index in the array will hold an enemy object or instance of an enemy. We clone the enemy type from one of the default enemies. ie: game.enemy[0] = structuredClone(game.enemyTypeOne)
@@ -212,7 +225,7 @@ function devTool(element) {
 
 function gameStart() {
   game.started = true;
-  player = structuredClone(game.playerDefault);
+  player = structuredClone(game.playerDefaults);
   player.laserProperties.laserArray = laserData.playerLasers // Store a reference to the playerLasers array
   render(false,player.location,player.color);
   gridUpdate(player.gridParameter,player.location,1,false);
@@ -225,14 +238,15 @@ function spawnEnemy() {
     return; // return and avoid spawning an enemy since there are no empty slots available for an enemy spawn
   }
   const index = enemy.indexOf(null); // Sets the index to the first available spot in the enemy array
-  max = game.enemyTypes.length-1; // Sets the maximum number that can be randomly generated to the last index of the enemyTypes array.
-  const randomEnemyIndex = Math.floor(Math.random()*((max+1)-0)+0); // Generates a random index to copy from the enemy.enemyTypes array, effectively choosing a random enemy type to spawn.
-  enemy[index] = structuredClone(game.enemyTypes[randomEnemyIndex]); // Copies the chosen enemy type's default object properties
+  max = game.enemyDefaults.length-1; // Sets the maximum number that can be randomly generated to the last index of the enemyDefaults array.
+  const randomEnemyIndex = Math.floor(Math.random()*((max+1)-0)+0); // Generates a random index to copy from the enemy.enemyDefaults array, effectively choosing a random enemy type to spawn.
+  enemy[index] = structuredClone(game.enemyDefaults[randomEnemyIndex]); // Copies the chosen enemy type's default object properties
+  enemy[index].laserProperties.laserArray = laserData.enemyLasers; // Sets a reference to the enemy lasers array.
+  enemy[index].movementPatterns.patterns = enemyData.typeOne.movementPatterns; // Updates the reference to make sure it points to the enemyData array and not some duplicate.
   max = enemy[index].movementPatterns.patterns.length-1; // Sets the maximum number that can be randomly generated to the last index of the patterns array.
   enemy[index].movementPatterns.currentPattern = Math.floor(Math.random()*((max+1)-0)+0); // Sets a random movement pattern to the active one.
   enemy[index].index = index; // Stores the index the object occupies in the enemy array as a property in the object
-  enemy[index].laserProperties.laserArray = laserData.enemyLasers; // Sets a reference to the enemy lasers array.
-  enemy[index].location = enemySpawnLocation(enemy[index].spawnLocations); // Calls the function to choose a random, valid spawn location and sets its returned value as the location.
+  enemy[index].location = chooseSpawnLocation(enemy[index].spawnLocations); // Calls the function to choose a random, valid spawn location and sets its returned value as the location.
   gridUpdate(enemy[index].gridParameter, enemy[index].location, index, false); // Update the grid cells the enemy occupies
   render(false, enemy[index].location, enemy[index].color); // Renders the enemy object on the board.
   enemy[index].attackInterval = setInterval(shootLaser, enemy[index].attackSpeed, enemy[index]); // Starts the attack interval for this enemy
@@ -240,7 +254,7 @@ function spawnEnemy() {
 }
 
 // Function for choosing a random, valid location to spawn an enemy. The parameter is a 2D array holding the possible spawn points.
-function enemySpawnLocation(possibleLocations) {
+function chooseSpawnLocation(possibleLocations) {
   let locationFound = false;
   let index;
   const max = possibleLocations.length-1; // Sets the maximum number that can be randomly generated to match the last index of the possibleLocations array.
@@ -319,14 +333,11 @@ function render(undraw, location, renderColor) {
 }
 
 function gridUpdate(gridParameter, location, index, remove) {
-  console.log(`Grid update called with ${gridParameter} parameter and ${index} index`);
   for(let i=0; i<location.length; i++) {
     const x = location[i][0];
     const y = location[i][1];
     if(remove) {
-      console.log(game.grid[x][y]);
       game.grid[x][y][gridParameter] = -1;
-      console.log(game.grid[x][y]);
     } else if(!remove) {
       game.grid[x][y][gridParameter] = index;
     }
@@ -365,11 +376,11 @@ function shootLaser(entity) {
   } else { // otherwise if there are no null indexes and the array isn't empty, we set the index to the first uninitiated index
     index = entity.laserProperties.laserArray.length;
   }
-  // Create the new laser object in it's respective array at index "index" with it's respective properties based on the object that shot it.
-  entity.laserProperties.laserArray[index] = structuredClone(entity.laserProperties);
-  entity.laserProperties.laserArray[index].laserArray = entity.laserProperties.laserArray; // Updates laser array pointer for safety, sometimes structuredClone doesn't properly clone references.
-  entity.laserProperties.laserArray[index].index = index; // Stores its respective index that it occupies in its laser Array.
-  entity.laserProperties.laserArray[index].location = laserSpawnLocation(entity); // Call the function for determining the spawn location for proper animation
+  // Create a new laser object in its respective array at index "index" with its respective properties inherited from the entity that shot it.
+  entity.laserProperties.laserArray[index] = structuredClone(entity.laserProperties); // Clones the laser object from the originating entity's laserProperties object parameter.
+  entity.laserProperties.laserArray[index].laserArray = entity.laserProperties.laserArray; // Updates laser array reference. structuredCopy() doesn't seem to be cloning the reference properly.
+  entity.laserProperties.laserArray[index].index = index; // Stores the index that it occupies in its laser Array as a property value for later reference.
+  entity.laserProperties.laserArray[index].location = laserSpawnLocation(entity); // Call the function for determining the laser's spawn location for proper firing animation.
   render(false, entity.laserProperties.laserArray[index].location, entity.laserProperties.color);
   entity.laserProperties.laserArray[index].moveInterval = setInterval(moveLaser, entity.laserProperties.speed, entity.laserProperties.laserArray[index]);
   // Check if more lasers need to be fired in the case of objects that fire multiple at once.
@@ -443,20 +454,28 @@ function laserCollision(laserObject) {
     }
   }
   if(destroy) {
-    destroyLaser(laserObject);
+    destroyObject(laserObject, laserObject.laserArray);
   }
 }
 
-// Function for removing lasers from the game once they've collided with something.
-function destroyLaser(laserObject) {
-  const location = laserObject.location;
-  const index = laserObject.index;
-  const gridParameter = laserObject.gridParameter;
-  const laserArray = laserObject.laserArray;
-  clearInterval(laserObject.moveInterval); // Stops the interval related to this laser.
-  gridUpdate(gridParameter, location, index, true); // Remove the laser data from the grid array.
-  render(true, location, laserObject.color); // Undraw the laser.
-  laserArray[index] = null; // Set the laser's respective array index to null to remove it
+// Modular function for destroying objects of any (or most) types. Takes two parameters, the first clearly being the object we want to destroy and the second being the array that the object exists in, so we can adjust said array once the object is gone. Player object or other objects without arrays that need updating can simply send "null" for second parameter.
+function destroyObject(objectToDestroy, objectArray) {
+  const location = objectToDestroy.location;
+  const index = objectToDestroy.index;
+  const gridParameter = objectToDestroy.gridParameter;
+  if(objectToDestroy.moveInterval) {
+    console.log("Clearing move interval");
+    clearInterval(objectToDestroy.moveInterval); // Stops the move interval if it exists.
+  }
+  if(objectToDestroy.attackInterval) {
+    console.log("Clearing attack interval");
+    clearInterval(objectToDestroy.attackInterval); // Stops the attack interval if it exists.
+  }
+  gridUpdate(gridParameter, location, index, true); // Remove the object data from the grid array.
+  render(true, location, objectToDestroy.color); // Undraw the object.
+  if(objectArray !== null) { // Player object will send null as array since it's the only object not stored in an array.
+    objectArray[index] = null; // Set the object's respective array index to null to remove it
+  }
 }
 
 function playerCollisions(gameObject) {
