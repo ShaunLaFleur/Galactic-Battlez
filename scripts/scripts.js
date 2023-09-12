@@ -5,6 +5,39 @@ let difficulty = {
   attackSpeedMod: 0,
   healthMod: 0,
 }
+const enemyData = {
+  typeOne: {
+    movementPatterns: [
+      ["left", "left", "left", "right", "down", "left", "up", "right", "right", "down", "up", "up", "left", "right", "down"],
+      ["left", "left", "left", "right", "up", "up", "left", "left", "right", "down", "left", "left", "left", "right", "down"],
+      ["right", "right", "right", "left", "down", "right", "right", "right", "left", "down", "right", "right", "right", "left", "down"],
+      ["left", "left", "up", "right", "down", "down", "down", "down", "down", "down", "left", "left", "right", "up", "up"],
+      ["left","right","up","up","right","up","right","up","up","right","right","left","up","up","up"]
+    ],
+    spawnLocations: [ // A 2D array storing all possible spawn positions/locations.
+    [[44,5],[41,4],[42,4],[43,4],[44,4],[45,4],[46,4],[47,4],[46,3],[45,3],[44,3],[43,3],[42,3],[43,2],[43,1],[42,1],[45,2],[45,1],[46,1]],
+    [[44,15],[41,14],[42,14],[43,14],[44,14],[45,14],[46,14],[47,14],[46,13],[45,13],[44,13],[43,13],[42,13],[43,12],[43,11],[42,11],[45,12],[45,11],[46,11]],
+    [[34,15],[31,14],[32,14],[33,14],[34,14],[35,14],[36,14],[37,14],[36,13],[35,13],[34,13],[33,13],[32,13],[33,12],[33,11],[32,11],[35,12],[35,11],[36,11]],
+    [[54,15],[51,14],[52,14],[53,14],[54,14],[55,14],[56,14],[57,14],[56,13],[55,13],[54,13],[53,13],[52,13],[53,12],[53,11],[52,11],[55,12],[55,11],[56,11]],
+    [[74,5],[71,4],[72,4],[73,4],[74,4],[75,4],[76,4],[77,4],[76,3],[75,3],[74,3],[73,3],[72,3],[73,2],[73,1],[72,1],[75,2],[75,1],[76,1]],
+    [[14,5],[11,4],[12,4],[13,4],[14,4],[15,4],[16,4],[17,4],[16,3],[15,3],[14,3],[13,3],[12,3],[13,2],[13,1],[12,1],[15,2],[15,1],[16,1]]
+    ]
+  },
+  typeTwo: {
+    movementPatterns: [
+      ["left","left","left","right","up","up","up","right","right","down","down","down","left","left","left"],
+      ["right","down","left","left","right","right","up","up","left","left","right","right","down","down","down"],
+      ["up","up","left","left","left","left","left","right","right","right","up","up","up","up","right"],
+      ["right","right","down","down","down","down","down","down","down","down","right","right","right","right","right"],
+      ["up","up","up","left","left","left","left","left","right","right","up","up","right","right","right"]
+    ],
+    spawnLocations: [ // A 2D array storing all possible spawn positions/locations.
+    [[46,15],[47,15],[48,15],[49,14],[48,14],[47,14],[46,14],[45,14],[44,12],[44,13],[45,13],[46,13],[47,13],[48,13],[49,13],[50,13],[50,12],[48,12],[47,12],[46,12],[46,11],[47,11],[48,11],[49,10],[48,9],[49,8],[48,7],[49,6],[46,10],[45,9],[46,8],[45,7],[46,6]],
+    [[36,15],[37,15],[38,15],[39,14],[38,14],[37,14],[36,14],[35,14],[34,12],[34,13],[35,13],[36,13],[37,13],[38,13],[39,13],[40,13],[40,12],[38,12],[37,12],[36,12],[36,11],[37,11],[38,11],[39,10],[38,9],[39,8],[38,7],[39,6],[36,10],[35,9],[36,8],[35,7],[36,6]],
+    [[66,15],[67,15],[68,15],[69,14],[68,14],[67,14],[66,14],[65,14],[64,12],[64,13],[65,13],[66,13],[67,13],[68,13],[69,13],[70,13],[70,12],[68,12],[67,12],[66,12],[66,11],[67,11],[68,11],[69,10],[68,9],[69,8],[68,7],[69,6],[66,10],[65,9],[66,8],[65,7],[66,6]],
+    ],
+  }
+}
 const game = {
   maxRows: 100,
   maxCols: 100,
@@ -53,25 +86,12 @@ const game = {
     },
     color:"enemy", // The name of the CSS color class.
     type:"enemy",
-    movementPatterns: { // Stores the AI movement patterns in a 2D array. One pattern is played out at a time at random.
-      patterns: [
-        ["left", "left", "left", "right", "down", "left", "up", "right", "right", "down", "up", "up", "left", "right", "down"],
-        ["left", "left", "left", "right", "up", "up", "left", "left", "right", "down", "left", "left", "left", "right", "down"],
-        ["right", "right", "right", "left", "down", "right", "right", "right", "left", "down", "right", "right", "right", "left", "down"],
-        ["left", "left", "up", "right", "down", "down", "down", "down", "down", "down", "left", "left", "right", "up", "up"],
-        ["left","right","up","up","right","up","right","up","up","right","right","left","up","up","up"]
-      ],
+    movementPatterns: {
+      patterns: enemyData.typeOne.movementPatterns, // Sets a reference to the enemie's movement pattern array so we don't have to copy it when we copy these default settings.
       patternIndex: 0, // Keeps track of which pattern is currently active.
       stepIndex: 0, // Keeps track of which step of the pattern the enemy is acting out.
     },
-    spawnLocations: [ // A 2D array storing all possible spawn positions/locations.
-      [[44,5],[41,4],[42,4],[43,4],[44,4],[45,4],[46,4],[47,4],[46,3],[45,3],[44,3],[43,3],[42,3],[43,2],[43,1],[42,1],[45,2],[45,1],[46,1]],
-      [[44,15],[41,14],[42,14],[43,14],[44,14],[45,14],[46,14],[47,14],[46,13],[45,13],[44,13],[43,13],[42,13],[43,12],[43,11],[42,11],[45,12],[45,11],[46,11]],
-      [[34,15],[31,14],[32,14],[33,14],[34,14],[35,14],[36,14],[37,14],[36,13],[35,13],[34,13],[33,13],[32,13],[33,12],[33,11],[32,11],[35,12],[35,11],[36,11]],
-      [[54,15],[51,14],[52,14],[53,14],[54,14],[55,14],[56,14],[57,14],[56,13],[55,13],[54,13],[53,13],[52,13],[53,12],[53,11],[52,11],[55,12],[55,11],[56,11]],
-      [[74,5],[71,4],[72,4],[73,4],[74,4],[75,4],[76,4],[77,4],[76,3],[75,3],[74,3],[73,3],[72,3],[73,2],[73,1],[72,1],[75,2],[75,1],[76,1]],
-      [[14,5],[11,4],[12,4],[13,4],[14,4],[15,4],[16,4],[17,4],[16,3],[15,3],[14,3],[13,3],[12,3],[13,2],[13,1],[12,1],[15,2],[15,1],[16,1]]
-    ]
+    spawnLocations: enemyData.typeOne.spawnLocations, // Sets a reference to the enemie's spawn locations array so we don't have to copy it when we copy these default settings.
     }, // End of enemy type 1 object
     { // Start of enemy type 2 object
       name:"EnemyTypeTwo",
@@ -95,21 +115,11 @@ const game = {
       color:"enemy", // The name of the CSS color class.
       type:"enemy",
       movementPatterns: { // Stores the AI movement patterns in a 2D array. One pattern is played out at a time at random.
-        patterns: [
-          ["left","left","left","right","up","up","up","right","right","down","down","down","left","left","left"],
-          ["right","down","left","left","right","right","up","up","left","left","right","right","down","down","down"],
-          ["up","up","left","left","left","left","left","right","right","right","up","up","up","up","right"],
-          ["right","right","down","down","down","down","down","down","down","down","right","right","right","right","right"],
-          ["up","up","up","left","left","left","left","left","right","right","up","up","right","right","right"]
-        ],
+        patterns: enemyData.typeTwo.movementPatterns,
         patternIndex: 0, // Keeps track of which pattern is currently active.
         stepIndex: 0, // Keeps track of which step of the pattern the enemy is acting out.
       },
-      spawnLocations: [ // A 2D array storing all possible spawn positions/locations.
-      [[46,15],[47,15],[48,15],[49,14],[48,14],[47,14],[46,14],[45,14],[44,12],[44,13],[45,13],[46,13],[47,13],[48,13],[49,13],[50,13],[50,12],[48,12],[47,12],[46,12],[46,11],[47,11],[48,11],[49,10],[48,9],[49,8],[48,7],[49,6],[46,10],[45,9],[46,8],[45,7],[46,6]],
-      [[36,15],[37,15],[38,15],[39,14],[38,14],[37,14],[36,14],[35,14],[34,12],[34,13],[35,13],[36,13],[37,13],[38,13],[39,13],[40,13],[40,12],[38,12],[37,12],[36,12],[36,11],[37,11],[38,11],[39,10],[38,9],[39,8],[38,7],[39,6],[36,10],[35,9],[36,8],[35,7],[36,6]],
-      [[66,15],[67,15],[68,15],[69,14],[68,14],[67,14],[66,14],[65,14],[64,12],[64,13],[65,13],[66,13],[67,13],[68,13],[69,13],[70,13],[70,12],[68,12],[67,12],[66,12],[66,11],[67,11],[68,11],[69,10],[68,9],[69,8],[68,7],[69,6],[66,10],[65,9],[66,8],[65,7],[66,6]],
-      ]
+      spawnLocations: enemyData.typeTwo.spawnLocations,
       }, // End of enemy type 2 object
   ],
 }
