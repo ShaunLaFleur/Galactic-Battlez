@@ -113,3 +113,7 @@ button:active {
 .player {
   background-color: white;
 }
+
+.damage-taken {
+  background-color: yellow;
+}
