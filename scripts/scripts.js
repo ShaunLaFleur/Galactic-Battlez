@@ -44,7 +44,9 @@ const enemyData = {
 }
 const debrisData = {
   debrisArray:[null, null, null],
-  spawnLocations:[],
+  spawnLocations:[
+    [[10,22],[11,22],[12,22],[13,21],[12,21],[11,21],[10,21],[9,21],[8,20],[9,20],[10,20],[11,20],[12,20],[13,20],[14,20],[14,19],[13,19],[12,19],[11,19],[10,19],[9,19],[8,19],[7,19],[6,18],[7,18],[8,18],[9,18],[10,18],[11,18],[12,18],[13,18],[14,18],[15,17],[14,17],[13,17],[12,17],[11,17],[10,17],[9,17],[8,17],[7,17],[6,17],[6,16],[7,16],[8,16],[9,16],[10,16],[11,16],[12,16],[13,16],[14,16],[15,16],[16,15],[15,15],[14,15],[13,15],[12,15],[11,15],[10,15],[9,15],[8,15],[7,15],[7,14],[8,14],[9,14],[10,14],[11,14],[12,14],[13,14],[14,14],[15,14],[16,14],[15,13],[14,13],[13,13],[12,13],[11,13],[10,13],[9,13],[8,13],[9,12],[10,12],[11,12],[12,12],[13,12],[12,11],[11,11],[10,11]]
+  ],
 }
 const game = {
   maxRows: 100,
@@ -158,7 +160,7 @@ const game = {
     health:20,
     damage:100,
     movement:{speed:20, distance:1},
-    debrisArray: debrisData.debrisArray,
+    debrisArray: debrisData.debrisArray, // this will need to be done after the structuredClone
     gridParameter: "debrisOccupied",
     index:-1,
     homeArray:[], // Will store a reference to the array it exists in later.
@@ -167,12 +169,13 @@ const game = {
 }
 let player = {}; // the object that will hold the player data
 let enemy = [null, null, null] // Each index in the array will hold an enemy object or instance of an enemy. We clone the enemy type from one of the default enemies. ie: game.enemy[0] = structuredClone(game.enemyTypeOne)
+let devArray = [];
 
 window.onload = function() {
   generateGrid();
 }
 
-// Generates the grid array. Since DIVs are placed left to right, we iterate through the rows on the outter loop and columns on the inner. We initialize each column once during their first iteration and then push each row into the column each subsequent iteration. The row index of the array holds an object containing the cell's data.
+// Generates the grid array. Since DIVs are placed left to right, we iterate through the rows on the outter loop and columns on the inner. We initialize each column once during their first iteration and then push each row into its respective column each subsequent iteration. The row index of the array holds an object containing the cell's data. So the result is game.grid[x][y], with the y index holding the object.
 function generateGrid() {
   for(let y=0; y<game.maxRows; y++) {
     for(let x=0; x<game.maxCols; x++) {
@@ -195,7 +198,7 @@ function generateGrid() {
         playerLaserOccupied:-1, // Refers to the index of the laser array for the laser object that occupies this location. Used for laser collision.
         enemyLaserOccupied:-1, // Refers to the index of the enemy laser array for the laser object that occupies this location. Used for laser collision.
         element:elem, // Stores a reference to it's respective DIV element for easier manipulation later.
-        colored:false, // start with background color, this is currently only for dev testing
+        colored:false, // this is currently only for dev testing
       });
     }
   }
@@ -237,6 +240,7 @@ function devTool(element) {
     game.grid[x][y].colored = true;
   } else {
     element.classList.remove("player");
+    devArray.push(`[${x},${y}],`);
     game.grid[x][y].colored = false;
   }
   console.log(`Grid position X: ${x}, Y: ${y}`);
@@ -254,7 +258,7 @@ function gameStart() {
 
 function createPlayerObject() {
   player = structuredClone(game.playerDefaults);
-  player.laserProperties.homeArray = laserData.playerLasers // Store a reference to the playerLasers array
+  player.laserProperties.homeArray = laserData.playerLasers // Store a reference to the playerLasers array; structuredClone doesn't properly clone references so we can't preset this reference
 }
 
 // Uses the setTimeout() function and a flash counter to display a flashing animation before the player is actually ready to move.
@@ -405,10 +409,10 @@ function invalidLocation(direction, location, distance, isEnemy, entity) {
       (direction === "right" && x >= game.maxCols - distance) ||
       (direction === "down" && y >= game.maxRows - distance) ||
       (direction === "up" && y <= distance-1) ||
-      (direction === "left" && isEnemy === true && (enemyEnemyCollision([x-distance,y],entity.index) || game.grid[x-distance][y].playerOccupied !== -1 || game.grid[x-distance][y].debrisOccupied !== -1)) ||
-      (direction === "right" && isEnemy === true && (enemyEnemyCollision([x+distance,y],entity.index) || game.grid[x+distance][y].playerOccupied !== -1 || game.grid[x+distance][y].debrisOccupied !== -1)) ||
-      (direction === "down" && isEnemy === true && (enemyEnemyCollision([x,y+distance],entity.index) || game.grid[x][y+distance].playerOccupied !== -1 || game.grid[x][y+distance].debrisOccupied !== -1 || y === game.enemyBoundary)) || // Prevents the enemies from going below the row that was set in game.enemyBoundary
-      (direction === "up" && isEnemy === true && (enemyEnemyCollision([x,y-distance],entity.index) || game.grid[x][y-distance].playerOccupied !== -1 || game.grid[x][y-distance].debrisOccupied !== -1)) 
+      (direction === "left" && isEnemy === true && (enemyDetected(x-distance, y,entity.index) || game.grid[x-distance][y].playerOccupied !== -1 || game.grid[x-distance][y].debrisOccupied !== -1)) ||
+      (direction === "right" && isEnemy === true && (enemyDetected(x+distance, y,entity.index) || game.grid[x+distance][y].playerOccupied !== -1 || game.grid[x+distance][y].debrisOccupied !== -1)) ||
+      (direction === "down" && isEnemy === true && (enemyDetected(x, y+distance,entity.index) || game.grid[x][y+distance].playerOccupied !== -1 || game.grid[x][y+distance].debrisOccupied !== -1 || y === game.enemyBoundary)) || // Prevents the enemies from going below the row that was set in game.enemyBoundary
+      (direction === "up" && isEnemy === true && (enemyDetected(x, y-distance,entity.index) || game.grid[x][y-distance].playerOccupied !== -1 || game.grid[x][y-distance].debrisOccupied !== -1)) 
     ){
       return true;
     }
@@ -416,14 +420,14 @@ function invalidLocation(direction, location, distance, isEnemy, entity) {
   return false;
 }
 
-// for loop to compare targetArray to every enemy's location array to check for matches -- return true or false depending on if it's found or not
+// for loop to compare coordinates to every enemy's (excluding the enemy triggering this) location array to check for matches -- return true or false depending on if it's found or not
 // This function is required because we can't simply check for "enemyOccupied" on the grid, because this will trigger on itself, preventing movement.
-function enemyEnemyCollision(targetArray, enemyIndex) {
+function enemyDetected(x, y, enemyIndex) {
   let result = false;
   for(let i=0; i<enemy.length; i++) {
     if(i !== enemyIndex && enemy[i] !== null) {
       for(let b=0; b<enemy[i].location.length; b++) {
-        if(targetArray.join("") === enemy[i].location[b].join("")) { // Converts each array to a string to make comparison easier and not require another loop.
+        if(enemy[i].location[b][0] === x && enemy[i].location[b][1] === y) {
           return true;
         }
       }
@@ -614,10 +618,17 @@ function playerCollisions(gameObject) {
 function playerDeath() {
   player.lives--;
   if(player.lives > 0) {
-    player.location = structuredClone(game.playerDefaults.location);
-    spawnPlayer(game.spawnFlashes);
+    player.location = structuredClone(game.playerDefaults.location); // Reset it's location to the default (spawn) location.
+    player.health = game.playerDefaults.health; // Resets health to maximum.
+    spawnPlayer(game.spawnFlashes); // Respawns player
+    // update inner html for lives count
   } else {
-    // end game
+    // destroy all enemies
+    // destroy all debris
+    // stop enemy spawn timer
+    // stop debris spawn timer
+    // set all laser arrays to empty
+    // unrendor player, set to alive = false;
     alert("GAME OVER");
   }
 }
