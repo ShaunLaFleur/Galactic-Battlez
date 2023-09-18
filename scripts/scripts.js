@@ -351,14 +351,17 @@ function enemyMovement(enemyEntity) {
 }
 
 // Function for moving and rendering objects on the board. moveDistance is how many cells each movement jumps per movement update.
-function move(direction,entity) {
-  if(typeof entity.alive !== undefined && entity.alive === false) { // if the entity that is moving has the alive parameter, checks if it is false or not
-    return;
-  }
+function move(direction, entity) {
   const location = entity.location;
   const renderColor = entity.color;
   const moveDistance = entity.movement.distance;
-  render(true,location,entity.color); // Undraws the current location
+  let isLaser = false;
+  if(typeof entity.alive !== undefined && entity.alive === false) { // if the entity that is moving has the alive parameter, checks if it is false or not
+    return;
+  } else if(entity.gridParameter === "enemyLaserOccupied") { // If the laser is an enemy laser we will call the render logic with isLaser set to true to avoid uncoloring other enemies if the laser passes through them.
+    isLaser = true;
+  }
+  render(true,location,entity.color, isLaser); // Undraws the current location
   for(let i=0; i<location.length; i++) {
     if(direction === "up") {
       location[i][1] -= moveDistance;
@@ -370,14 +373,17 @@ function move(direction,entity) {
       location[i][0] += moveDistance;
     }
   }
-  render(false,location,renderColor); // Draws the updated location
+  render(false, location, renderColor); // Draws the updated location
 }
 
 // Function for rendering. Adds and removes css classes for the rendering.
-function render(undraw, location, renderColor) {
+function render(undraw, location, renderColor, isLaser) {
   for(let i=0; i<location.length; i++) {
     const x = location[i][0];
     const y = location[i][1];
+    if(isLaser && game.grid[x][y].enemyOccupied !== -1) { // For better rendering graphics only.
+      return;
+    }
     if(undraw === true) {
       game.grid[x][y].element.classList.remove(renderColor);
     } else {
@@ -420,20 +426,18 @@ function invalidLocation(direction, location, distance, isEnemy, entity) {
   return false;
 }
 
-// for loop to compare coordinates to every enemy's (excluding the enemy triggering this) location array to check for matches -- return true or false depending on if it's found or not
-// This function is required because we can't simply check for "enemyOccupied" on the grid, because this will trigger on itself, preventing movement.
-function enemyDetected(x, y, enemyIndex) {
-  let result = false;
-  for(let i=0; i<enemy.length; i++) {
-    if(i !== enemyIndex && enemy[i] !== null) {
-      for(let b=0; b<enemy[i].location.length; b++) {
-        if(enemy[i].location[b][0] === x && enemy[i].location[b][1] === y) {
-          return true;
-        }
+// This function is required because we can't simply check for "enemyOccupied" on the grid, because this will trigger on moving enemy's own self, preventing movement completely.
+function enemyDetected(x, y, index) {
+  if(game.grid[x][y].enemyOccupied === -1) { // If there's no enemy at this location we just return false for no enemy detected.
+    return false;
+  } else {
+    for(let i=0; i<enemy[index].location.length; i++) { // Loops through the currently moving enemy's location array to search coordinates.
+      if(enemy[index].location[i][0] === x && enemy[index].location[i][1] === y) { // Searches the given coordinates to see if they exist in the moving enemy's location array.
+        return false; // If it is found, we return false, because no enemy (other enemy) is detected and it is safe to move.
       }
     }
   }
-  return result;
+  return true; // Otherwise, we know the enemy occupying this grid is not the same enemy currently moving, so we return true, since an enemy (different enemy) IS  detected at this location.
 }
 
 // Modular function for creating lasers when they are shot by either a player or enemy object. The parameter is for the originating object so we can get properties off of said object so we can create the laser accordingly.
