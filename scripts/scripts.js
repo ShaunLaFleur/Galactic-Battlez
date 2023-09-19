@@ -192,9 +192,15 @@ function generateGrid() {
       elem.className = "cell";
       // Pushes an object that holds the cells data into it's corresponding column and row.
       game.grid[x].push({
-        occupied:{type:"none"}, // Stores a reference to the object that occupies this location.
         element:elem, // Stores a reference to it's respective DIV element for easier manipulation later.
         colored:false, // this is currently only for dev testing
+        occupying: { // Object that holds properties that reference each object type that occupies this cell. 0 means none of this type currently occupy the cell.
+          player:0,
+          enemy:0,
+          debris:0,
+          playerlaser:0,
+          enemylaser:0,
+        }
       });
     }
   }
@@ -288,17 +294,18 @@ function spawnEnemy() {
   max = game.enemyDefaults.length-1; // Sets the maximum number that can be randomly generated to the last index of the enemyDefaults array.
   const randomEnemyIndex = Math.floor(Math.random()*((max+1)-0)+0); // Generates a random index to copy from the enemy.enemyDefaults array, effectively choosing a random enemy type to spawn.
   enemy[index] = structuredClone(game.enemyDefaults[randomEnemyIndex]); // Copies the chosen enemy type's default object properties
-  enemy[index].homeArray = enemy; // Sets the homeArray to the enemy array to point out that it exists inside of the enemy array.
-  enemy[index].laserProperties.homeArray = laserData.enemyLasers; // Sets a reference to the enemy lasers array.
-  enemy[index].movementPatterns.patterns = enemyData.typeOne.movementPatterns; // Updates the reference to make sure it points to the enemyData array and not some duplicate.
-  max = enemy[index].movementPatterns.patterns.length-1; // Sets the maximum number that can be randomly generated to the last index of the patterns array.
-  enemy[index].movementPatterns.currentPattern = Math.floor(Math.random()*((max+1)-0)+0); // Sets a random movement pattern to the active one.
-  enemy[index].index = index; // Stores the index the object occupies in the enemy array as a property in the object
-  enemy[index].location = chooseSpawnLocation(enemy[index].spawnLocations); // Calls the function to choose a random, valid spawn location and sets its returned value as the location.
-  gridUpdate(enemy[index], false); // Update the grid cells the enemy occupies
-  render(false, enemy[index].location, enemy[index].color); // Renders the enemy object on the board.
-  enemy[index].attackInterval = setInterval(shootLaser, enemy[index].attackSpeed, enemy[index]); // Starts the attack interval for this enemy
-  enemy[index].moveInterval = setInterval(enemyMovement, enemy[index].movement.speed, enemy[index]); // Starts the moving interval for this enemy
+  enemyObject = enemy[index]; // Sets a reference to the enemy object
+  enemyObject.homeArray = enemy; // Sets the homeArray to the enemy array to point out that it exists inside of the enemy array.
+  enemyObject.laserProperties.homeArray = laserData.enemyLasers; // Sets a reference to the enemy lasers array.
+  enemyObject.movementPatterns.patterns = enemyData.typeOne.movementPatterns; // Updates the reference to make sure it points to the enemyData array and not some duplicate.
+  max = enemyObject.movementPatterns.patterns.length-1; // Sets the maximum number that can be randomly generated to the last index of the patterns array.
+  enemyObject.movementPatterns.currentPattern = Math.floor(Math.random()*((max+1)-0)+0); // Sets a random movement pattern to the active one.
+  enemyObject.index = index; // Stores the index the object occupies in the enemy array as a property in the object
+  enemyObject.location = chooseSpawnLocation(enemyObject.spawnLocations); // Calls the function to choose a random, valid spawn location and sets its returned value as the location.
+  gridUpdate(enemyObject, false); // Update the grid cells the enemy occupies
+  render(false, enemyObject.location, enemyObject.color); // Renders the enemy object on the board.
+  enemyObject.attackInterval = setInterval(shootLaser, enemyObject.attackSpeed, enemyObject); // Starts the attack interval for this enemy
+  enemyObject.moveInterval = setInterval(enemyMovement, enemyObject.movement.speed, enemyObject); // Starts the moving interval for this enemy
 }
 
 // Function for choosing a random, valid location to spawn an enemy. The parameter is a 2D array holding all possible spawn points.
@@ -313,11 +320,11 @@ function chooseSpawnLocation(possibleLocations) {
       const x = possibleLocations[index][i][0];
       const y = possibleLocations[index][i][1];
       if(
-        game.grid[x][y].occupied.type === "enemy" ||
-        game.grid[x][y].occupied.type === "player" ||
-        game.grid[x][y].occupied.type === "debris" ||
-        game.grid[x][y].occupied.type === "playerlaser" ||
-        game.grid[x][y].occupied.type === "enemylaser"
+        game.grid[x][y].occupying.enemy !== 0 ||
+        game.grid[x][y].occupying.player !== 0 ||
+        game.grid[x][y].occupying.debris !== 0 ||
+        game.grid[x][y].occupying.playerlaser !== 0 ||
+        game.grid[x][y].occupying.enemylaser !== 0
         ){
         locationFound = false;
       } else {
@@ -394,12 +401,12 @@ function gridUpdate(entity, remove) {
     const x = location[i][0];
     const y = location[i][1];
     if(remove) {
-      game.grid[x][y].occupied = {type:"none"};
+      game.grid[x][y].occupying[entity.type] = 0;
     } else if(!remove) {
       if(entity.type === "player") {
-        game.grid[x][y].occupied = player; // Stores a reference to the player object.
+        game.grid[x][y].occupying[entity.type] = player; // Stores a reference to the player object.
       } else {
-        game.grid[x][y].occupied = homeArray[index]; // Sets a reference to the object that occupies this location
+        game.grid[x][y].occupying[entity.type] = homeArray[index]; // Sets a reference to the object that occupies this location
       }
     }
   }
@@ -416,10 +423,10 @@ function invalidLocation(direction, location, distance, entity) {
       (direction === "right" && x >= game.maxCols - distance) ||
       (direction === "down" && y >= game.maxRows - distance) ||
       (direction === "up" && y <= distance-1) ||
-      (direction === "left" && entity.type === "enemy" && (enemyDetected(x-distance, y,entity) || game.grid[x-distance][y].occupied.type === "player" || game.grid[x-distance][y].occupied.type === "debris")) ||
-      (direction === "right" && entity.type === "enemy" && (enemyDetected(x+distance, y,entity) || game.grid[x+distance][y].occupied.type === "player" || game.grid[x+distance][y].occupied.type === "debris")) ||
-      (direction === "down" && entity.type === "enemy" && (enemyDetected(x, y+distance,entity) || game.grid[x][y+distance].occupied.type === "player" || game.grid[x][y+distance].occupied.type === "debris" || y === game.enemyBoundary)) || // Prevents the enemies from going below the row that was set in game.enemyBoundary
-      (direction === "up" && entity.type === "enemy" && (enemyDetected(x, y-distance,entity) || game.grid[x][y-distance].occupied.type === "player" || game.grid[x][y-distance].occupied.type === "debris")) 
+      (direction === "left" && entity.type === "enemy" && (enemyDetected(x-distance, y,entity) || game.grid[x-distance][y].occupying.player !== 0 || game.grid[x-distance][y].occupying.debris !== 0)) ||
+      (direction === "right" && entity.type === "enemy" && (enemyDetected(x+distance, y,entity) || game.grid[x+distance][y].occupying.player !== 0 || game.grid[x+distance][y].occupying.debris !== 0)) ||
+      (direction === "down" && entity.type === "enemy" && (enemyDetected(x, y+distance,entity) || game.grid[x][y+distance].occupying.player !== 0 || game.grid[x][y+distance].occupying.debris !== 0 || y === game.enemyBoundary)) || // Prevents the enemies from going below the row that was set in game.enemyBoundary
+      (direction === "up" && entity.type === "enemy" && (enemyDetected(x, y-distance,entity) || game.grid[x][y-distance].occupying.player !== 0 || game.grid[x][y-distance].occupying.debris !== 0)) 
     ){
       return true;
     }
@@ -429,7 +436,7 @@ function invalidLocation(direction, location, distance, entity) {
 
 // This function is required because we can't simply check for "enemyOccupied" on the grid, because this will trigger on moving enemy's own self, preventing movement completely.
 function enemyDetected(x, y, enemy) {
-  if(game.grid[x][y].occupied.type !== "enemy") { // If there's no enemy at this location we just return false for no enemy detected.
+  if(game.grid[x][y].occupying.enemy === 0) { // If there's no enemy at this location we just return false for no enemy detected.
     return false;
   } else {
     for(let i=0; i<enemy.location.length; i++) { // Loops through the currently moving enemy's location array to search coordinates.
@@ -518,25 +525,17 @@ return spawn;
 // probably pass entire laser object here instead of location parameter so we can get values related to whether it's an enemy or player
 function moveLaser(laserObject) {
   const direction = laserObject.direction;
-  const collision = laserCollisionCheck(laserObject, direction); // Checks for a possible future collision if the laser moves one more row up or down depending on its moving direction
-  if(!collision) { // If no collision is found, continues moving.
-    gridUpdate(laserObject, true); // Removes laser data from cells
-    move(direction, laserObject); // Moves and renders the new location
-    gridUpdate(laserObject, false); // Adds the laser data to the new cells
-  }
+  gridUpdate(laserObject, true); // Removes laser data from cells
+  move(direction, laserObject); // Moves and renders the new location
+  gridUpdate(laserObject, false); // Adds the laser data to the new cells
+  laserCollisionCheck(laserObject); // Checks for laser collisions after the laser moves.
 }
 
 // Function for checking if the laser has collided with anything.
-function laserCollisionCheck(laserObject, direction) {
-  let modifier;
-  if(direction === "up") {
-    modifier = -1;
-  } else if(direction === "down") {
-    modifier = 1;
-  }
+function laserCollisionCheck(laserObject) {
   for(let i = 0; i<laserObject.location.length; i++) {
     let x = laserObject.location[i][0];
-    let y = laserObject.location[i][1]+modifier; // Sets the position to one row above or below depending on which direction the laser is moving (using modifier variable)
+    let y = laserObject.location[i][1]; // Sets the position to one row above or below depending on which direction the laser is moving (using modifier variable)
     // If a laser hits the top edge, destroy it
     if(y === 0) {
       destroyObject(laserObject);
@@ -545,11 +544,11 @@ function laserCollisionCheck(laserObject, direction) {
     } else if(y >= game.maxRows-1) {
       destroyObject(laserObject);
       return true;
-    } else if(laserObject.type === "playerlaser" && game.grid[x][y].occupied.type === "enemy") {
-      const enemyObject = game.grid[x][y].occupied;
+    } else if(laserObject.type === "playerlaser" && game.grid[x][y].occupying.enemy !== 0) {
+      const enemyObject = game.grid[x][y].occupying.enemy;
       laserHitsEntity(laserObject, enemyObject); // Send both the laser object and the enemy object to a function for handling the collision
       return true;
-    } else if(laserObject.type === "enemylaser" && game.grid[x][y].occupied.type === "player") {
+    } else if(laserObject.type === "enemylaser" && game.grid[x][y].occupying.player !== 0) {
       laserHitsEntity(laserObject, player);
       return true;
     }
@@ -621,6 +620,7 @@ function destroyObject(objectToDestroy) {
   }
 }
 
+// Will be used to detect if a player has collided with debris or an enemy. Called AFTER the player moves.
 function playerCollisions(gameObject) {
   const location = gameObject.location;
   for(i=0; i<location.length; i++) {
