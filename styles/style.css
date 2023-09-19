@@ -101,9 +101,12 @@ button:active {
   float: left;
 }
 
-
 .enemy {
   background-color: red;
+}
+
+.enemyLaser {
+  background-color: orange;
 }
 
 .laser {
