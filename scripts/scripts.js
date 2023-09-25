@@ -11,12 +11,12 @@ const laserData = {
 }
 const enemyData = {
   typeOne: {
-    movementPatterns: [
-      ["left", "left", "left", "right", "down", "left", "up", "right", "right", "down", "up", "up", "left", "right", "down"],
-      ["left", "left", "left", "right", "up", "up", "left", "left", "right", "down", "left", "left", "left", "right", "down"],
-      ["right", "right", "right", "left", "down", "right", "right", "right", "left", "down", "right", "right", "right", "left", "down"],
-      ["left", "left", "up", "right", "down", "down", "down", "down", "down", "down", "left", "left", "right", "up", "up"],
-      ["left","right","up","up","right","up","right","up","up","right","right","left","up","up","up"]
+    movementPatterns: [ // 
+      [[-1, 0],[-1, 0],[-1, 0],[1, 0],[0, 1],[-1, 0],[0, -1],[1, 0],[1, 0],[0, 1],[0, -1],[0, -1],[-1, 0],[1, 0],[0, 1]],
+      [[-1, 0],[-1, 0],[-1, 0],[1, 0],[0, -1],[0, -1],[-1, 0],[-1, 0],[1, 0],[0, 1],[-1, 0],[-1, 0],[-1, 0],[1, 0],[0, 1]],
+      [[1, 0],[1, 0],[1, 0],[-1, 0],[0, 1],[1, 0],[1, 0],[1, 0],[-1, 0],[0, 1],[1, 0],[1, 0],[1, 0],[-1, 0],[0, 1]],
+      [[-1, 0],[-1, 0],[0, -1],[1, 0],[0, 1],[0, 1],[0, 1],[0, 1],[0, 1],[0, 1],[-1, 0],[-1, 0],[1, 0],[0, -1],[0, -1]],
+      [[-1, 0],[1, 0],[0, -1],[0, -1],[1, 0],[0, -1],[1, 0],[0, -1],[0, -1],[1, 0],[1, 0],[-1, 0],[0, -1],[0, -1],[0, -1]]
     ],
     spawnLocations: [ // A 2D array storing all possible spawn positions/locations.
     [[44,5],[41,4],[42,4],[43,4],[44,4],[45,4],[46,4],[47,4],[46,3],[45,3],[44,3],[43,3],[42,3],[43,2],[43,1],[42,1],[45,2],[45,1],[46,1]],
@@ -26,14 +26,14 @@ const enemyData = {
     [[74,5],[71,4],[72,4],[73,4],[74,4],[75,4],[76,4],[77,4],[76,3],[75,3],[74,3],[73,3],[72,3],[73,2],[73,1],[72,1],[75,2],[75,1],[76,1]],
     [[14,5],[11,4],[12,4],[13,4],[14,4],[15,4],[16,4],[17,4],[16,3],[15,3],[14,3],[13,3],[12,3],[13,2],[13,1],[12,1],[15,2],[15,1],[16,1]]
     ]
-  },
-  typeTwo: {
+    },
+    typeTwo: {
     movementPatterns: [
-      ["left","left","left","right","up","up","up","right","right","down","down","down","left","left","left"],
-      ["right","down","left","left","right","right","up","up","left","left","right","right","down","down","down"],
-      ["up","up","left","left","left","left","left","right","right","right","up","up","up","up","right"],
-      ["right","right","down","down","down","down","down","down","down","down","right","right","right","right","right"],
-      ["up","up","up","left","left","left","left","left","right","right","up","up","right","right","right"]
+      [[-1, 0],[-1, 0],[-1, 0],[1, 0],[0, -1],[0, -1],[0, -1],[1, 0],[1, 0],[0, 1],[0, 1],[0, 1],[-1, 0],[-1, 0],[-1, 0]],
+      [[1, 0],[0, 1],[-1, 0],[-1, 0],[1, 0],[1, 0],[0, -1],[0, -1],[-1, 0],[-1, 0],[1, 0],[1, 0],[0, 1],[0, 1],[0, 1]],
+      [[0, -1],[0, -1],[-1, 0],[-1, 0],[-1, 0],[-1, 0],[-1, 0],[1, 0],[1, 0],[1, 0],[0, -1],[0, -1],[0, -1],[0, -1],[1, 0]],
+      [[1, 0],[1, 0],[0, 1],[0, 1],[0, 1],[0, 1],[0, 1],[0, 1],[0, 1],[0, 1],[1, 0],[1, 0],[1, 0],[1, 0],[1, 0]],
+      [[0, -1],[0, -1],[0, -1],[-1, 0],[-1, 0],[-1, 0],[-1, 0],[-1, 0],[1, 0],[1, 0],[0, -1],[0, -1],[1, 0],[1, 0],[1, 0]]
     ],
     spawnLocations: [ // A 2D array storing all possible spawn positions/locations.
     [[46,15],[47,15],[48,15],[49,14],[48,14],[47,14],[46,14],[45,14],[44,12],[44,13],[45,13],[46,13],[47,13],[48,13],[49,13],[50,13],[50,12],[48,12],[47,12],[46,12],[46,11],[47,11],[48,11],[49,10],[48,9],[49,8],[48,7],[49,6],[46,10],[45,9],[46,8],[45,7],[46,6]],
@@ -77,7 +77,7 @@ const game = {
       color:"laser", // The name of the CSS color class.
       damage:10,
       type:"playerlaser",
-      direction:"up",
+      direction:[0, -1], // Up
       index:-1,
       movement: {speed: 2, distance: 1},
       moveInterval: null,
@@ -107,7 +107,7 @@ const game = {
       damage: 10, // The amount of damage done to the player if the laser hits.
       color: "enemyLaser", // The name of the CSS color class.
       type: "enemylaser",
-      direction: "down",
+      direction: [0, 1], // Down
       index:-1,
       movement: {speed: 10, distance: 1},
       moveInterval: null,
@@ -140,7 +140,7 @@ const game = {
         damage:20, // The amount of damage done to the player if the laser hits.
         color:"enemyLaser", // The name of the CSS color class.
         type:"enemylaser",
-        direction:"down",
+        direction: [0, 1], // Down
         index:-1,
         movement: {speed: 10, distance: 1},
         moveInterval: null,
@@ -214,19 +214,24 @@ document.addEventListener("keydown", event => {
   if(event.code === "Space") {
     shootLaser(player);
   } else {
-    let direction = "none";
-    if (event.code === "ArrowLeft" && (!invalidLocation("left", player.location, player.movement.distance, player))) {
-      direction = "left";
-    } else if(event.code === "ArrowRight" && (!invalidLocation("right", player.location, player.movement.distance, player))) {
-      direction = "right";
-    } else if(event.code === "ArrowDown" && (!invalidLocation("down", player.location, player.movement.distance, player))) {
-      direction = "down";
-    } else if(event.code === "ArrowUp" && (!invalidLocation("up", player.location, player.movement.distance, player))) {
-      direction = "up";
+    let dx;
+    let dy;
+    if (event.code === "ArrowLeft" && (!invalidLocation(-1, 0, player.location, player))) {
+      dx = -1;
+      dy = 0;
+    } else if(event.code === "ArrowRight" && (!invalidLocation(1, 0, player.location, player))) {
+      dx = 1;
+      dy = 0;
+    } else if(event.code === "ArrowDown" && (!invalidLocation(0, 1, player.location, player))) {
+      dx = 0;
+      dy = 1;
+    } else if(event.code === "ArrowUp" && (!invalidLocation(0, -1, player.location, player))) {
+      dx = 0;
+      dy = -1;
     }
-    if(direction !== "none") {
+    if(dx !== undefined) {
       gridUpdate(player,true); // Removes current location from the cell data.
-      move(direction,player); // Moves the object by undrawing, updating coordinates and then redrawing
+      move(dx, dy, player); // Moves the object by undrawing, updating coordinates and then redrawing
       gridUpdate(player,false); // Adds the new updated location to the cell data.
     }
   }
@@ -335,15 +340,17 @@ function chooseSpawnLocation(possibleLocations) {
   return possibleLocations[index];
 }
 
+// Have to refactor this and the pattern storage. Directions such as "left" and "right" need to be adjusted to be coords.
 function enemyMovement(enemyEntity) {
   const patterns = enemyEntity.movementPatterns.patterns;
   const max = patterns.length-1; // Sets max to the last index of the patterns array
   const patternIndex = enemyEntity.movementPatterns.patternIndex; // Stores the index of the current movement pattern
   const stepIndex = enemyEntity.movementPatterns.stepIndex; // Stores the index of the current step we are on in the current movement pattern.
-  let direction = patterns[patternIndex][stepIndex];
-  if(!invalidLocation(direction, enemyEntity.location, enemyEntity.movement.distance, enemyEntity)) {
+  const dx = patterns[patternIndex][stepIndex][0];
+  const dy = patterns[patternIndex][stepIndex][1];
+  if(!invalidLocation(dx, dy, enemyEntity.location, enemyEntity)) {
     gridUpdate(enemyEntity, true); // Removes current location data from the grid.
-    move(direction, enemyEntity); // Move and re-render object
+    move(dx, dy, enemyEntity); // Move and re-render object
     gridUpdate(enemyEntity, false); // Update location data on the grid
   }
   if(stepIndex === patterns[patternIndex].length-1) { // Check if we are at the last step of the movement pattern.
@@ -355,24 +362,21 @@ function enemyMovement(enemyEntity) {
 }
 
 // Function for moving and rendering objects on the board. moveDistance is how many cells each movement jumps per movement update.
-function move(direction, entity) {
+// Could modularize by sending -1 or 1 instead of direction and then using that to convert the moveDistance variable to negative/positive, then adjust the x or y coordinate accordingly.
+function move(dx, dy, entity) {
   const location = entity.location;
   const renderColor = entity.color;
-  const moveDistance = entity.movement.distance;
+  const distance = entity.movement.distance;
+  dx *= distance; 
+  dy *= distance;
+
   if(typeof entity.alive !== undefined && entity.alive === false) { // if the entity that is moving has the alive parameter, checks if it is false or not
     return;
   }
   render(true, location, renderColor); // Undraws the current location
-  for(let i=0; i<location.length; i++) {
-    if(direction === "up") {
-      location[i][1] -= moveDistance;
-    } else if(direction === "down") {
-      location[i][1] += moveDistance;
-    } else if(direction === "left") {
-      location[i][0] -= moveDistance;
-    } else if(direction === "right") {
-      location[i][0] += moveDistance;
-    }
+  for(const coords of location) {
+    coords[0] += dx;
+    coords[1] += dy;
   }
   render(false, location, renderColor); // Draws the updated location
 }
@@ -404,7 +408,7 @@ function gridUpdate(entity, remove) {
       game.grid[x][y].occupying[entity.type] = 0;
     } else if(!remove) {
       if(entity.type === "player") {
-        game.grid[x][y].occupying[entity.type] = player; // Stores a reference to the player object.
+        game.grid[x][y].occupying.player = player; // Stores a reference to the player object.
       } else {
         game.grid[x][y].occupying[entity.type] = homeArray[index]; // Sets a reference to the object that occupies this location
       }
@@ -412,29 +416,28 @@ function gridUpdate(entity, remove) {
   }
 }
 
-// Function for checking for invalid movements based on entityType (player or enemy). "Distance"" is used to adjust for objects moving different amounts of rows per movement.
-function invalidLocation(direction, location, distance, entity) {
-  // Loops through each segment of the location to check for invalid grid positions.
-  for (let i = 0; i < location.length; i++) {
-    const x = location[i][0];
-    const y = location[i][1];
-    if (
-      (direction === "left" && x <= distance-1) ||
-      (direction === "right" && x >= game.maxCols - distance) ||
-      (direction === "down" && y >= game.maxRows - distance) ||
-      (direction === "up" && y <= distance-1) ||
-      (direction === "left" && entity.type === "enemy" && (enemyDetected(x-distance, y,entity) || game.grid[x-distance][y].occupying.player !== 0 || game.grid[x-distance][y].occupying.debris !== 0)) ||
-      (direction === "right" && entity.type === "enemy" && (enemyDetected(x+distance, y,entity) || game.grid[x+distance][y].occupying.player !== 0 || game.grid[x+distance][y].occupying.debris !== 0)) ||
-      (direction === "down" && entity.type === "enemy" && (enemyDetected(x, y+distance,entity) || game.grid[x][y+distance].occupying.player !== 0 || game.grid[x][y+distance].occupying.debris !== 0 || y === game.enemyBoundary)) || // Prevents the enemies from going below the row that was set in game.enemyBoundary
-      (direction === "up" && entity.type === "enemy" && (enemyDetected(x, y-distance,entity) || game.grid[x][y-distance].occupying.player !== 0 || game.grid[x][y-distance].occupying.debris !== 0)) 
-    ){
-      return true;
+function invalidLocation(dx, dy, location, entity) {
+  console.log(`Checking invalid with a dx of ${dx} and a dy of ${dy}`);
+  const distance = entity.movement.distance;
+  dx *= distance; // Since different objects/entities may move more than one grid space per movement, we multiply dx with the distance property to get the correct grid cell to check.
+  dy *= distance; // Since different objects/entities may move more than one grid space per movement, we multiply dx with the distance property to get the correct grid cell to check.
+  console.log(`dx of ${dx} and a dy of ${dy} after distance update`);
+  console.log(isOutsideGrid(dx, dy));
+  for(const coords of location) {
+    const x = coords[0];
+    const y = coords[1];
+    if(isOutsideGrid(x+dx, y+dy) || entity.type === "enemy" && (enemyDetected(x+dx, y+dy,entity) || game.grid[x+dx][y+dy].occupying.player !== 0 || game.grid[x+dx][y+dy].occupying.debris !== 0)) {
+      return true; // As soon as any coordinate from the location is found to be an invalid location we stop the loop and return true.
     }
   }
-  return false;
+  return false; // <-- Must be placed OUTSIDE of the for loop, otherwise it will prematurely return false before all location coordinates are checked.
+  // Helper function to determine if the potential location is outside of the grid area.
+  function isOutsideGrid(x, y) {
+    return x < 0 || x >= game.maxCols || y < 0 || y >= game.maxRows;
+  }
 }
 
-// This function is required because we can't simply check for "enemyOccupied" on the grid, because this will trigger on moving enemy's own self, preventing movement completely.
+// This function is required because we can't simply check for "enemyOccupied" on adjacent cells, because this will trigger on the moving enemy's own self, since each individual piece that makes up the enemy checks its adjacent cells.
 function enemyDetected(x, y, enemy) {
   if(game.grid[x][y].occupying.enemy === 0) { // If there's no enemy at this location we just return false for no enemy detected.
     return false;
@@ -524,9 +527,10 @@ return spawn;
 
 // probably pass entire laser object here instead of location parameter so we can get values related to whether it's an enemy or player
 function moveLaser(laserObject) {
-  const direction = laserObject.direction;
+  const dx = laserObject.direction[0];
+  const dy = laserObject.direction[1];
   gridUpdate(laserObject, true); // Removes laser data from cells
-  move(direction, laserObject); // Moves and renders the new location
+  move(dx, dy, laserObject); // Moves and renders the new location
   gridUpdate(laserObject, false); // Adds the laser data to the new cells
   laserCollisionCheck(laserObject); // Checks for laser collisions after the laser moves.
 }
@@ -621,7 +625,7 @@ function destroyObject(objectToDestroy) {
 }
 
 // Will be used to detect if a player has collided with debris or an enemy. Called AFTER the player moves.
-function playerCollisions(gameObject) {
+function playerCollisionCheck(gameObject) {
   const location = gameObject.location;
   for(i=0; i<location.length; i++) {
     const x = length[i][0];
