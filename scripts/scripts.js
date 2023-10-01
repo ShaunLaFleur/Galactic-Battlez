@@ -1,3 +1,9 @@
+/*
+unrender
+ternary if to swap between damage class and default class
+render
+*/
+
 // Game Settings
 const maxRows = 100;
 const maxCols = 100;
@@ -7,6 +13,7 @@ const deathFlashes = 10; // How many times an entity flashes when it dies.
 const deathFlashSpeed = 200; // The flash speed in milliseconds.
 const spawnFlashes = 4; // How many times the player flashes when they spawn.
 const spawnFlashSpeed = 500; // The spawn flash speed in milliseconds.
+const enemyArray = [null, null, null]; // Defines how many enemies can exist at once. Enemies can only be spawned if null exists in the array, they are not added to the array otherwwise.
 
 // Player Settings
 const playerHealth = 50;
@@ -16,21 +23,71 @@ const playerSpawnLocation = [[50, 90], [49, 91], [50, 91], [51, 91], [48, 92], [
 const playerLives = 3;
 const playerConcurrentLasers = 1;
 const playerEntityType = "player";
-const playerColorClass = "player-entity";
+const playerDefaultColorClass = "player-entity"; // We change the colorClass property of the player when it flashes due to damage being taken, so we can restore its default class by referencing this.
 const playerLaserSpeed = 25;
 const playerLaserDamage = 10;
 const playerLaserType = "playerlaser";
 const playerLaserColorClass = "playerLaser";
 
+// Enemy Settings
+const enemyType = "enemy";
+const enemyLaserColorClass = "enemyLaser";
+const enemyLaserType = "enemyLaser";
+
+// Enemy Type One
+const enemyTypeOneHealth = 30;
+const enemyTypeOneMovementSpeed = 1200;
+const enemyTypeOneMovementDistance = 8;
+const enemyTypeOneAttackSpeed = 1500;
+const enemyTypeOneColorClass = "enemy-entity";
+const enemyTypeOneLaserMax = 1;
+const enemyTypeOneLaserDamage = 10;
+const enemyTypeOneLaserSpeed = 10;
+const enemyTypeOneMovementPatterns = [ 
+  [[-1, 0],[-1, 0],[-1, 0],[1, 0],[0, 1],[-1, 0],[0, -1],[1, 0],[1, 0],[0, 1],[0, -1],[0, -1],[-1, 0],[1, 0],[0, 1]],
+  [[-1, 0],[-1, 0],[-1, 0],[1, 0],[0, -1],[0, -1],[-1, 0],[-1, 0],[1, 0],[0, 1],[-1, 0],[-1, 0],[-1, 0],[1, 0],[0, 1]],
+  [[1, 0],[1, 0],[1, 0],[-1, 0],[0, 1],[1, 0],[1, 0],[1, 0],[-1, 0],[0, 1],[1, 0],[1, 0],[1, 0],[-1, 0],[0, 1]],
+  [[-1, 0],[-1, 0],[0, -1],[1, 0],[0, 1],[0, 1],[0, 1],[0, 1],[0, 1],[0, 1],[-1, 0],[-1, 0],[1, 0],[0, -1],[0, -1]],
+  [[-1, 0],[1, 0],[0, -1],[0, -1],[1, 0],[0, -1],[1, 0],[0, -1],[0, -1],[1, 0],[1, 0],[-1, 0],[0, -1],[0, -1],[0, -1]]
+];
+const enemyTypeOneSpawnLocations = [ // A 2D array storing all possible spawn positions/locations.
+  [[44,5],[41,4],[42,4],[43,4],[44,4],[45,4],[46,4],[47,4],[46,3],[45,3],[44,3],[43,3],[42,3],[43,2],[43,1],[42,1],[45,2],[45,1],[46,1]],
+  [[44,15],[41,14],[42,14],[43,14],[44,14],[45,14],[46,14],[47,14],[46,13],[45,13],[44,13],[43,13],[42,13],[43,12],[43,11],[42,11],[45,12],[45,11],[46,11]],
+  [[34,15],[31,14],[32,14],[33,14],[34,14],[35,14],[36,14],[37,14],[36,13],[35,13],[34,13],[33,13],[32,13],[33,12],[33,11],[32,11],[35,12],[35,11],[36,11]],
+  [[54,15],[51,14],[52,14],[53,14],[54,14],[55,14],[56,14],[57,14],[56,13],[55,13],[54,13],[53,13],[52,13],[53,12],[53,11],[52,11],[55,12],[55,11],[56,11]],
+  [[74,5],[71,4],[72,4],[73,4],[74,4],[75,4],[76,4],[77,4],[76,3],[75,3],[74,3],[73,3],[72,3],[73,2],[73,1],[72,1],[75,2],[75,1],[76,1]],
+  [[14,5],[11,4],[12,4],[13,4],[14,4],[15,4],[16,4],[17,4],[16,3],[15,3],[14,3],[13,3],[12,3],[13,2],[13,1],[12,1],[15,2],[15,1],[16,1]]
+];
+/* -- End Const Variable Setup -- */
+
+// These initiatations aren't entirely necessary but they help remind me of functionality I'll be using.
 class Enemy {
-
+  constructor() {
+    this.position = [];
+    this.homeArray = game.enemies;
+    this.attackInterval;
+    this.movementInterval;
+    this.index = -1;
+    this.type = enemyType;
+    this.movementPatternIndex;
+    this.movementPatternStepIndex;
+  }
 }
 
-class EnemyOne extends Enemy {
-
+class EnemyTypeOne extends Enemy {
+  constructor() {
+    this.health = enemyTypeOneHealth;
+    this.movementSpeed = enemyTypeOneMovementSpeed;
+    this.movementDistance = enemyTypeOneMovementDistance;
+    this.colorClass = enemyTypeOneColorClass;
+    this.movementPatterns = enemyTypeOneMovementPatterns;
+    this.spawnLocations = enemyTypeOneSpawnLocations;
+    this.laserMax = enemyTypeOneLaserMax;
+    this.laserCount = 0;
+  }
 }
 
-class EnemyTwo extends Enemy {
+class EnemyTypeTwo extends Enemy {
 
 }
 
@@ -47,7 +104,8 @@ class Player {
     this.laserClass = PlayerLaser;
     this.laserCount = 0;
     this.concurrentLasers = playerConcurrentLasers;
-    this.colorClass = playerColorClass;
+    this.colorClass = playerDefaultColorClass;
+    this.defaultColorClass = playerDefaultColorClass; // So we can modularize the damage flashing
     this.index = 1; // Used to store this value on the cell to signify the player occupies the cell. This is called index just for modularity, because other objects use indexes.
     this.laserArray = game.playerLasers; // The array that stores player laser objects when they're created.
   }
@@ -89,6 +147,33 @@ class Laser {
       deleteObject(this);
     }
   }
+}
+
+class EnemyLaser extends Laser {
+  constructor() {
+    super();
+    this.homeArray = game.enemyLasers;
+    this.laserColorClass = enemyLaserColorClass;
+    this.type = enemyLaserType;
+    this.index = -1;
+    this.moveInterval;
+    this.direction = [0, 1]; // Down
+  }
+}
+
+class EnemyTypeOneLaser extends EnemyLaser {
+  constructor() {
+    super();
+    this.damage = enemyTypeOneLaserDamage;
+    this.speed = enemyTypeOneLaserSpeed;
+  }
+}
+
+class EnemyTypeTwoLaser extends EnemyLaser {
+  constructor() {
+    super();
+  }
+
 }
 
 class PlayerLaser extends Laser {
@@ -142,21 +227,24 @@ class Grid {
 
 class Game {
   constructor() {
-    this.maxRows = maxRows;
-    this.maxCols = maxCols;
+    this.rows = maxRows;
+    this.cols = maxCols;
     this.laserCooldown = laserCooldown; // Player laser coolddown in milliseconds.
     this.enemyBoundary = enemyBoundary; // The row enemies are unable to go below.
     this.deathFlashes = deathFlashes; // How many times an entity flashes when it dies.
     this.deathFlashSpeed = deathFlashSpeed; // The flash speed in milliseconds.
     this.spawnFlashes = spawnFlashes; // How many times the player flashes when they spawn.
     this.spawnFlashSpeed = spawnFlashSpeed; // The spawn flash speed in milliseconds.
-    this.enemyTypes = [EnemyOne, EnemyTwo]; // Stores references to each enemy class type. Used for spawning a random enemy type.
+    this.enemyTypes = [EnemyTypeOne, EnemyTypeTwo]; // Stores references to each enemy class type. Used for spawning a random enemy type.
     this.playerLasers = [];
     this.enemyLasers = [];
+    this.enemies = [...enemyArray]; // Copies the enemyArray from setup.
+    this.debris = [];
+    this.enemySpawnInterval;
   }
 }
 
-/* -- End Setup -- */
+/* -- End Class & Method Setup -- */
 
 let game = new Game(); // Start a new game instance
 let player = new Player(); // Create a new player instance.
@@ -207,6 +295,15 @@ document.addEventListener("keydown", event => {
   }
 });
 
+// Function for choosing a random enemy to spawn
+function spawnRandomEnemy() {
+  if(game.enemies.indexOf(null) === -1) {
+    return; // Return if there are no empty spots to spawn an enemy in the enemies array
+  }
+  const index = game.enemies.indexOf(null); // Grab the index of the empty spot in the array
+  // do stuff
+}
+
 
 // We pass the entire object when moving and rendering due to the large amount of parameters needed. It's more future proof and easier to maintain. If we need to add/remove parameters later we don't need to do so at every function call, but only in the functions themselves.
 function moveObject(dx, dy, movingObject) {
@@ -237,6 +334,11 @@ function render(action, renderingObject) {
       grid.cell[x][y].element.classList.remove(colorClass);
     }
   }
+}
+
+// Unlike players, enemy units are not allowed to move into other objects, so we need additional checks before they move.
+function validEnemyMovement() {
+
 }
 
 function isInsideGrid(dx, dy, position) {
@@ -278,14 +380,19 @@ function deleteObject(objectToDelete) {
   const objectArray = objectToDelete.homeArray;// Stores a reference to the array this object exists in
   const index = objectToDelete.index; // Stores the index the object occupies of the array it exists in
   // Clear any intervals attached to this object if they exist.
+  clearObjectIntervals(objectToDelete);
+  // Remove this object from the grid.
+  render("undraw", objectToDelete);
+  // Remove this object from its home array.
+  objectArray[index] = null;
+}
+
+// Separate function for clearing intervals so when we reset the game we can simply clear intervals rather than run through the entire object deletion process (since we'll be creating a new Game instance anyhow)
+function clearObjectIntervals(objectToDelete) {
   if(objectToDelete.moveInterval) {
     clearInterval(objectToDelete.moveInterval);
   }
   if(objectToDelete.attackInterval) {
     clearInterval(objectToDelete.attackInterval);
   }
-  // Remove this object from the grid.
-  render("undraw", objectToDelete);
-  // Remove this object from its home array.
-  objectArray[index] = null;
 }

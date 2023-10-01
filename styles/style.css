@@ -101,7 +101,7 @@ button:active {
   float: left;
 }
 
-.enemy {
+.enemy-entity {
   background-color: red;
 }
 
