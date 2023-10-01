@@ -1,27 +1,26 @@
 // Game Settings
-const MAX_ROWS = 100;
-const MAX_COLS = 100;
-const LASER_COOLDOWN = 300; // Player laser coolddown in milliseconds.
-const ENEMY_BOUNDARY = 36; // The row enemies are unable to go below.
-const DEATH_FLASHES = 10; // How many times an entity flashes when it dies.
-const DEATH_FLASH_SPEED = 200; // The flash speed in milliseconds.
-const SPAWN_FLASHES = 4; // How many times the player flashes when they spawn.
-const SPAWN_FLASH_SPEED = 500; // The spawn flash speed in milliseconds.
+const maxRows = 100;
+const maxCols = 100;
+const laserCooldown = 300; // Player laser coolddown in milliseconds.
+const enemyBoundary = 36; // The row enemies are unable to go below.
+const deathFlashes = 10; // How many times an entity flashes when it dies.
+const deathFlashSpeed = 200; // The flash speed in milliseconds.
+const spawnFlashes = 4; // How many times the player flashes when they spawn.
+const spawnFlashSpeed = 500; // The spawn flash speed in milliseconds.
 
 // Player Settings
-const HEALTH = 50;
-const PLAYER_MOVE_SPEED = 20; // The cooldown in milliseconds for how fast the player can move again after moving.
-const PLAYER_MOVE_DISTANCE = 5; // How many cells the player moves per movement.
-const PLAYER_SPAWN_LOCATION = [[50, 90], [49, 91], [50, 91], [51, 91], [48, 92], [49, 92], [50, 92], [51, 92], [52, 92], [48, 93], [49, 93], [51, 93], [52, 93], [48, 94], [52, 94]];
-const PLAYER_LIVES = 3;
-const PLAYER_LASER_MAX = 1;
-const PLAYER_ENTITY_TYPE = "player";
-const PLAYER_COLOR_CLASS = "player-entity";
-const PLAYER_LASER_SPEED = 25;
-const PLAYER_LASER_DAMAGE = 10;
-const PLAYER_LASER_TYPE = "playerlaser";
-const PLAYER_LASER_COLOR_CLASS = "playerLaser"
-
+const playerHealth = 50;
+const playerMoveSpeed = 20; // The cooldown in milliseconds for how fast the player can move again after moving.
+const playerMoveDistance = 5; // How many cells the player moves per movement.
+const playerSpawnLocation = [[50, 90], [49, 91], [50, 91], [51, 91], [48, 92], [49, 92], [50, 92], [51, 92], [52, 92], [48, 93], [49, 93], [51, 93], [52, 93], [48, 94], [52, 94]];
+const playerLives = 3;
+const playerConcurrentLasers = 1;
+const playerEntityType = "player";
+const playerColorClass = "player-entity";
+const playerLaserSpeed = 25;
+const playerLaserDamage = 10;
+const playerLaserType = "playerlaser";
+const playerLaserColorClass = "playerLaser";
 
 class Enemy {
 
@@ -37,18 +36,18 @@ class EnemyTwo extends Enemy {
 
 class Player {
   constructor() {
-    this.type = PLAYER_ENTITY_TYPE;
-    this.health = HEALTH;
-    this.movementSpeed = PLAYER_MOVE_SPEED;
-    this.moveDistance = PLAYER_MOVE_DISTANCE;
-    this.position = structuredClone(PLAYER_SPAWN_LOCATION); // Clones the PLAYER_SPAWN_LOCATION array.
+    this.type = playerEntityType;
+    this.health = playerHealth;
+    this.movementSpeed = playerMoveSpeed;
+    this.moveDistance = playerMoveDistance;
+    this.position = structuredClone(playerSpawnLocation); // Clones the PLAYER_SPAWN_LOCATION array.
     this.alive = true;
-    this.lives = PLAYER_LIVES;
+    this.lives = playerLives;
     this.laserCooldown = false;
     this.laserClass = PlayerLaser;
     this.laserCount = 0;
-    this.laserMax = PLAYER_LASER_MAX;
-    this.colorClass = PLAYER_COLOR_CLASS;
+    this.concurrentLasers = playerConcurrentLasers;
+    this.colorClass = playerColorClass;
     this.index = 1; // Used to store this value on the cell to signify the player occupies the cell. This is called index just for modularity, because other objects use indexes.
     this.laserArray = game.playerLasers; // The array that stores player laser objects when they're created.
   }
@@ -95,10 +94,10 @@ class Laser {
 class PlayerLaser extends Laser {
   constructor() {
     super();
-    this.type = PLAYER_LASER_TYPE;
-    this.speed = PLAYER_LASER_SPEED; // How often the laser move function is called in milliseconds.
-    this.damage = PLAYER_LASER_DAMAGE;
-    this.colorClass = PLAYER_LASER_COLOR_CLASS;
+    this.type = playerLaserType;
+    this.speed = playerLaserSpeed; // How often the laser move function is called in milliseconds.
+    this.damage = playerLaserDamage;
+    this.colorClass = playerLaserColorClass;
     this.direction = [0, -1]; // Up
   }
 
@@ -143,8 +142,14 @@ class Grid {
 
 class Game {
   constructor() {
-    this.rows = MAX_ROWS;
-    this.cols = MAX_COLS;
+    this.maxRows = maxRows;
+    this.maxCols = maxCols;
+    this.laserCooldown = laserCooldown; // Player laser coolddown in milliseconds.
+    this.enemyBoundary = enemyBoundary; // The row enemies are unable to go below.
+    this.deathFlashes = deathFlashes; // How many times an entity flashes when it dies.
+    this.deathFlashSpeed = deathFlashSpeed; // The flash speed in milliseconds.
+    this.spawnFlashes = spawnFlashes; // How many times the player flashes when they spawn.
+    this.spawnFlashSpeed = spawnFlashSpeed; // The spawn flash speed in milliseconds.
     this.enemyTypes = [EnemyOne, EnemyTwo]; // Stores references to each enemy class type. Used for spawning a random enemy type.
     this.playerLasers = [];
     this.enemyLasers = [];
@@ -202,13 +207,8 @@ document.addEventListener("keydown", event => {
   }
 });
 
-/* 
-dx and dy are coordinate adjustments
-color class is the css class to add/remove
-objectType is the objectType used to create a parameter in the cell object in order to track what object occupies it
-position is the location to be drawn/undrawn on the grid
-index is mainly used for non-player objects that exist in arrays, this value is placed with the objectType property to indicate what type of object and its index in its home array so we can refernce it indirectly
-*/
+
+// We pass the entire object when moving and rendering due to the large amount of parameters needed. It's more future proof and easier to maintain. If we need to add/remove parameters later we don't need to do so at every function call, but only in the functions themselves.
 function moveObject(dx, dy, movingObject) {
   const position = movingObject.position;
   render("undraw", movingObject); // Undraw the current position
@@ -261,9 +261,16 @@ function shootLaser(entity) {
   } else {
     laserArray[index] = new laserClass();
   }
+  entity.laserCount++;
   laserArray[index].index = index; // Stores the index that the laser object occupies in the array it exists in
   laserArray[index].homeArray = laserArray; // Stores a self reference to the array that the laser object exists in
-  laserArray[index].spawnLaser(); // Creates the laser on the grid and starts moving it
+  laserArray[index].spawnLaser(entity.laserCount); // Creates the laser on the grid and starts moving it. Parameter is for entities that shoot multiple lasers at once.
+  // Check for entities that can fire multiple lasers at once.
+  if(entity.laserCount < entity.concurrentLasers) {
+    shootLaser(entity); // If we need to shoot another laser because this entity can shoot multiple at once, we recursively call the shoot laser function
+  } else {
+    entity.laserCount = 0;
+  }
 }
 
 // Function for removing non-player objects from the game
