@@ -109,11 +109,11 @@ button:active {
   background-color: orange;
 }
 
-.laser {
+.playerLaser {
   background-color: green;
 }
 
-.player {
+.player-entity {
   background-color: white;
 }
 
