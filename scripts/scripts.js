@@ -14,6 +14,7 @@ const deathFlashSpeed = 200; // The flash speed in milliseconds.
 const spawnFlashes = 4; // How many times the player flashes when they spawn.
 const spawnFlashSpeed = 500; // The spawn flash speed in milliseconds.
 const enemyArray = [null, null, null]; // Defines how many enemies can exist at once. Enemies can only be spawned if null exists in the array, they are not added to the array otherwwise.
+const objectTypes = ["player", "playerLaser", "enemy", "enemyLaser"] // Used to initiate the cell object parameters that we need to set as null
 
 // Player Settings
 const playerHealth = 50;
@@ -26,7 +27,7 @@ const playerEntityType = "player";
 const playerDefaultColorClass = "player-entity"; // We change the colorClass property of the player when it flashes due to damage being taken, so we can restore its default class by referencing this.
 const playerLaserSpeed = 25;
 const playerLaserDamage = 10;
-const playerLaserType = "playerlaser";
+const playerLaserType = "playerLaser";
 const playerLaserColorClass = "playerLaser";
 
 // Enemy Settings
@@ -118,7 +119,7 @@ class Player {
     const adj = this.moveDistance; // Use moveDistance to multiply the dx and dy adjustments to make the player move the correct distance
     dx *= adj;
     dy *= adj;
-    if(isInsideGrid(dx, dy, this.position)) { // Check if the updated positon is within the grid boundaries
+    if(isValidMove(dx, dy, this.position, this.type)) { // Check if the updated positon is within the grid boundaries
       moveObject(dx, dy, this); // Move to the new position if it's within grid boundaries
       // check player collisions by calling an external function
     }
@@ -140,7 +141,7 @@ class Laser {
   move() {
     const dx = this.direction[0];
     const dy = this.direction[1];
-    if(isInsideGrid(dx, dy, this.position)) {
+    if(isValidMove(dx, dy, this.position, this.type)) {
       moveObject(dx, dy, this);
       // call modular laser collision check function here
     } else {
@@ -198,9 +199,16 @@ class PlayerLaser extends Laser {
 class Cell {
   constructor(element) {
     this.element = element;
-    this.player = 0;
     element.classList.remove(...element.classList);
     element.classList.add("cell");
+    this.initializeOccupancy();
+  }
+
+  // To track what objects are occupying each cell, we use the same name as the "type" property of each object as a property of each cell object, and then either set it to null or a direct reference to the object that occupies it.
+  initializeOccupancy() {
+    for(const type of objectTypes) {
+      this[type] = null;
+    }
   }
 }
 
@@ -322,34 +330,33 @@ function render(action, renderingObject) {
   const colorClass = renderingObject.colorClass;
   const objectType = renderingObject.type;
   const position = renderingObject.position;
-  const index = renderingObject.index;
   for(const coords of position) {
     const x = coords[0];
     const y = coords[1];
     if(action === "draw") {
       grid.cell[x][y].element.classList.add(colorClass);
-      grid.cell[x][y][objectType] = index;
+      grid.cell[x][y][objectType] = renderingObject; // Set a direct reference to the object that occupies this cell
     } else {
-      grid.cell[x][y][objectType] = 0;
+      grid.cell[x][y][objectType] = null; // Set null. We use null instead of undefined because when undefined is thrown I know I made an error such as in type name.
       grid.cell[x][y].element.classList.remove(colorClass);
     }
   }
 }
 
-// Unlike players, enemy units are not allowed to move into other objects, so we need additional checks before they move.
-function validEnemyMovement() {
-
-}
-
-function isInsideGrid(dx, dy, position) {
+function isValidMove(dx, dy, position, entityType) {
   for(const coords of position) {
     const x = coords[0] + dx;
     const y = coords[1] + dy;
-    if(x < 0 || x >= game.cols || y < 0 || y >= game.rows) {
-      return false;
+    if(x < 0 || x >= game.cols || y < 0 || y >= game.rows || (entityType === "enemy" && (y > game.enemyBoundary || !noEnemyCollision()))) {
+      return false; // Return false if this is an invalid movement
     }
   }
-  return true;
+  return true; // If we make it through the checks, then we return true because this movement is valid and acceptable.
+
+  // Unlike players, enemy units are not allowed to move into other objects, so we need additional checks before they move using this helper function
+  function noEnemyCollision(x, y) {
+    return true;
+  }
 }
 
 function shootLaser(entity) {
