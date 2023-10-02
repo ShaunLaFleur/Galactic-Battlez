@@ -14,7 +14,7 @@ const deathFlashSpeed = 200; // The flash speed in milliseconds.
 const spawnFlashes = 4; // How many times the player flashes when they spawn.
 const spawnFlashSpeed = 500; // The spawn flash speed in milliseconds.
 const enemyArray = [null, null, null]; // Defines how many enemies can exist at once. Enemies can only be spawned if null exists in the array, they are not added to the array otherwwise.
-const objectTypes = ["player", "playerLaser", "enemy", "enemyLaser"] // Used to initiate the cell object parameters that we need to set as null
+const objectTypes = ["player", "playerLaser", "enemy", "enemyLaser", "debris"] // Used to initiate the cell object parameters that we need to set as null
 const damagedColorClass = "damage-taken";
 
 // Player Settings
@@ -30,11 +30,13 @@ const playerLaserSpeed = 10;
 const playerLaserDamage = 10;
 const playerLaserType = "playerLaser";
 const playerLaserColorClass = "playerLaser";
+const playerLaserCanDamageTypes = ["debris", "enemy"];
 
 // Enemy Settings
 const enemyType = "enemy";
 const enemyLaserColorClass = "enemyLaser";
 const enemyLaserType = "enemyLaser";
+const enemyLaserCanDamageTypes = ["debris", "player"]; // the types of objects that an enemy laser can damage
 
 // Enemy Type One
 const enemyTypeOneHealth = 30;
@@ -78,7 +80,6 @@ class Enemy {
   }
 
   spawn() {
-    console.log("Spawn called");
     const max = this.spawnLocations.length-1;
     const randomIndex = randomNum(0, max);
     this.position = this.spawnLocations[randomIndex];
@@ -87,7 +88,6 @@ class Enemy {
   }
 
   getNewMovementPattern() {
-    console.log("Get new pattern called");
     this.movementPatternStepIndex = 0; // Reset the step index
     clearInterval(this.movementInterval);
     const max = this.movementPatterns.length-1;
@@ -96,7 +96,6 @@ class Enemy {
   }
 
   move() {
-    console.log("Move called");
     const patternIndex = this.movementPatternIndex;
     const stepIndex = this.movementPatternStepIndex;
     const adj = this.movementDistance;
@@ -163,7 +162,7 @@ class Laser {
     this.position;
     this.index = null; // Holds the index where this laser object exists within its home array.
   }
-    // Function to render the laser object on the grid based on the entity type that shot it. Using laserStartPoint as a starting reference makes this function modular.
+    // Function to render the laser object on the grid based on the entity type that shot it. Using laserStartPoint as a starting reference for where to spawn the laser, as well as handling multiple laser firing allows the function to be modular.
     renderLaser(shootingEntity) {
       const dy = this.direction[1]; // We only need to alter the y coordinate since lasers only move up and down, so we don't need dx, only dy.
       const index = this.laserStartPoint; // Get the index for the segment of the shooting object that the laser will fire out of
@@ -183,7 +182,7 @@ class Laser {
   move(dx, dy) {
     if(isValidMove(dx, dy, this)) {
       moveObject(dx, dy, this);
-      // call modular laser collision check function here AFTER moving
+      laserCollisionCheck(this);
     } else {
       deleteObject(this);
     }
@@ -199,6 +198,7 @@ class EnemyLaser extends Laser {
     this.index = null;
     this.moveInterval;
     this.direction = [0, 1]; // Down
+    this.laserCanDamageTypes = enemyLaserCanDamageTypes;
   }
 }
 
@@ -230,6 +230,7 @@ class PlayerLaser extends Laser {
     this.direction = [0, -1]; // Up
     this.index = null;
     this.laserStartPoint = 0; // Index of the player position array for the object piece that the laser shoots from
+    this.laserCanDamageTypes = playerLaserCanDamageTypes; // The types of objects that a player laser can damage.
   }
 }
 
@@ -379,7 +380,6 @@ function moveObject(dx, dy, movingObject) {
 
 // Handles rendering or unrendering objects from the grid. I could use a single loop and while updating the position in the moveObject function, send the coordinates over to be drawn/undrawn, however, keeping them separate allows me to use the render function separately from the move function, such as when spawning objects.
 function render(action, renderingObject) {
-  console.log("Render called");
   const colorClass = renderingObject.colorClass;
   const objectType = renderingObject.type;
   const position = renderingObject.position;
@@ -396,20 +396,21 @@ function render(action, renderingObject) {
   }
 }
 
+// Checks if a move is valid BEFORE allowing the object to move. This is not to be confused by the function that checks whether collisions have occured after moving. This function attempts to prevent illegal collisions.
 function isValidMove(dx, dy, movingObject) {
   const position = movingObject.position;
   const entityType = movingObject.type;
   for(const coords of position) {
     const x = coords[0] + dx;
     const y = coords[1] + dy;
-    if(x < 0 || x >= game.cols || y < 0 || y >= game.rows || (entityType === "enemy" && (y > game.enemyBoundary || enemyCollision(x, y, movingObject)))) {
+    if(x < 0 || x >= game.cols || y < 0 || y >= game.rows || (entityType === "enemy" && (y > game.enemyBoundary || potentialEnemyCollision(x, y, movingObject)))) {
       return false; // Return false if this is an invalid movement
     }
   }
   return true; // If we make it through the checks, then we return true because this movement is valid and acceptable.
 
   // Unlike players, enemy units are not allowed to move into other objects, so we need additional checks before they move using this helper function
-  function enemyCollision(x, y, enemy) {
+  function potentialEnemyCollision(x, y, enemy) {
     // Cycle through every object type and check if they exist in grid x,y. If an enemy exists, we must check if it's the same enemy calling this function, because we don't want it to self trigger.
     for(const objectType of game.objectTypes) {
       if((objectType !== "enemy" && grid.cell[x][y][objectType] !== null) || (objectType === "enemy" && grid.cell[x][y].enemy !== null && grid.cell[x][y].enemy.index !== enemy.index)) {
@@ -441,6 +442,22 @@ function shootLaser(entity) {
   } else {
     entity.laserCount = 0;
   }
+}
+
+// Modular laser collision check function that takes the laserCanDamageTypes array, cycles through it and checks if the laser has collided with any of these object types.
+function laserCollisionCheck(laser) {
+  const objectTypes = laser.laserCanDamageTypes;
+  const position = laser.position;
+  for(const coords of position) { // Cycles through the coordinates of every segment of the laser object
+    const x = coords[0];
+    const y = coords[1];
+    for(const type of objectTypes) { // Cycles through each object type that this laser can collide with and checks it against the current laser coordinate
+      if(grid.cell[x][y][type] !== null) {
+        deleteObject(laser); // This will be handled later, here we can deal damage to the the object that was hit and call a "takeDamage" method on the object or call a function and send the object.
+      }
+    }
+  }
+
 }
 
 function randomNum(min, max) {
