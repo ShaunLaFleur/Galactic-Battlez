@@ -66,17 +66,19 @@ class Enemy {
   constructor() {
     this.position = [];
     this.homeArray = game.enemies;
+    this.laserArray = game.enemyLasers;
     this.attackInterval;
     this.movementInterval;
-    this.index = -1;
+    this.index = null;
     this.type = enemyType;
-    this.movementPatternIndex;
-    this.movementPatternStepIndex;
+    this.movementPatternIndex = [];
+    this.movementPatternStepIndex = [];
   }
 }
 
 class EnemyTypeOne extends Enemy {
   constructor() {
+    super();
     this.health = enemyTypeOneHealth;
     this.movementSpeed = enemyTypeOneMovementSpeed;
     this.movementDistance = enemyTypeOneMovementDistance;
@@ -85,6 +87,11 @@ class EnemyTypeOne extends Enemy {
     this.spawnLocations = enemyTypeOneSpawnLocations;
     this.laserMax = enemyTypeOneLaserMax;
     this.laserCount = 0;
+    this.laserClass = EnemyTypeOneLaser;
+  }
+
+  spawn() {
+    render("draw", this);
   }
 }
 
@@ -114,36 +121,35 @@ class Player {
   spawn() {
     render("draw", this);
   }
-
-  move(dx, dy) {
-    const adj = this.moveDistance; // Use moveDistance to multiply the dx and dy adjustments to make the player move the correct distance
-    dx *= adj;
-    dy *= adj;
-    if(isValidMove(dx, dy, this.position, this.type)) { // Check if the updated positon is within the grid boundaries
-      moveObject(dx, dy, this); // Move to the new position if it's within grid boundaries
-      // check player collisions by calling an external function
-    }
-  }
 }
 
 class Laser {
   constructor() {
     this.moveInterval; // The lasers movement interval is stored here.
     this.position;
-    this.homeArray; // Self reference the array the laser object exists in
     this.index = null; // Holds the index where this laser object exists within its home array.
   }
-
+    // Function to render the laser object on the grid based on the entity type that shot it. Using laserStartPoint as a starting reference makes this function modular.
+    renderLaser(shootingEntity) {
+      const dy = this.direction[1]; // We only need to alter the y coordinate since lasers only move up and down, so we don't need dx, only dy.
+      const index = this.laserStartPoint; // Get the index for the segment of the shooting object that the laser will fire out of
+      const x = shootingEntity.position[index][0]; // Grab the x coordinate of the segment
+      const y = shootingEntity.position[index][1]; // Grab the y coordiante of the segment
+      this.position = [[x, y+dy], [x, y+(dy*2)], [x, y+(dy*3)]]; // Adjust the lasers location above or below (depending on direction) the segment it fires from.
+      render("draw", this); // Render the object on the grid
+      this.startMoveInterval(); // Start moving the laser in the direction
+    }
+  // Starts the moving interval that repeatedly calls the this.move() method to move the laser.
   startMoveInterval() {
     this.moveInterval = setInterval(() => this.move(), this.speed);
   }
-
+  // The function that actually moves the laser and checks if each movement is valid before the move is executed. Deletes the laser object if a collision occurs.
   move() {
     const dx = this.direction[0];
     const dy = this.direction[1];
-    if(isValidMove(dx, dy, this.position, this.type)) {
+    if(isValidMove(dx, dy, this)) {
       moveObject(dx, dy, this);
-      // call modular laser collision check function here
+      // call modular laser collision check function here AFTER moving
     } else {
       deleteObject(this);
     }
@@ -154,9 +160,9 @@ class EnemyLaser extends Laser {
   constructor() {
     super();
     this.homeArray = game.enemyLasers;
-    this.laserColorClass = enemyLaserColorClass;
+    this.colorClass = enemyLaserColorClass;
     this.type = enemyLaserType;
-    this.index = -1;
+    this.index = null;
     this.moveInterval;
     this.direction = [0, 1]; // Down
   }
@@ -167,6 +173,7 @@ class EnemyTypeOneLaser extends EnemyLaser {
     super();
     this.damage = enemyTypeOneLaserDamage;
     this.speed = enemyTypeOneLaserSpeed;
+    this.laserStartPoint = 0;
   }
 }
 
@@ -185,14 +192,8 @@ class PlayerLaser extends Laser {
     this.damage = playerLaserDamage;
     this.colorClass = playerLaserColorClass;
     this.direction = [0, -1]; // Up
-  }
-
-  spawnLaser() {
-    const x = player.position[0][0];
-    const y = player.position[0][1];
-    this.position = [[x,y-1],[x,y-2],[x,y-3]]
-    render("draw", this);
-    this.startMoveInterval(); // Start the moving interval
+    this.index = null;
+    this.laserStartPoint = 0; // Index of the player position array for the object piece that the laser shoots from
   }
 }
 
@@ -249,6 +250,7 @@ class Game {
     this.enemies = [...enemyArray]; // Copies the enemyArray from setup.
     this.debris = [];
     this.enemySpawnInterval;
+    this.objectTypes = objectTypes;
   }
 }
 
@@ -275,11 +277,12 @@ window.onload = function () {
   grid = new Grid(); // Generate a new grid object that holds the cells array.
 }
 
-// Key press functionality
+// Key press functionality & Player Movement
 document.addEventListener("keydown", event => {
   console.log("Event listener triggered");
-  if(event.code === "Space") {
+  if(event.code === "Space" && !player.laserCooldown) {
     shootLaser(player);
+
   } else {
     let dx;
     let dy;
@@ -298,7 +301,14 @@ document.addEventListener("keydown", event => {
       dy = -1;
     }
     if(dx !== undefined) {
-      player.move(dx, dy);
+      // Use moveDistance to multiply the dx and dy adjustments to make the player move the correct distance
+      const adj = player.moveDistance; 
+      dx *= adj;
+      dy *= adj;
+      if(isValidMove(dx, dy, player)) { // Check if the updated positon is a valid movement
+        moveObject(dx, dy, player); // Move to the new position if it's within grid boundaries
+        // check player collisions after moving
+      }
     }
   }
 });
@@ -343,19 +353,28 @@ function render(action, renderingObject) {
   }
 }
 
-function isValidMove(dx, dy, position, entityType) {
+function isValidMove(dx, dy, movingObject) {
+  const position = movingObject.position;
+  const entityType = movingObject.type;
   for(const coords of position) {
     const x = coords[0] + dx;
     const y = coords[1] + dy;
-    if(x < 0 || x >= game.cols || y < 0 || y >= game.rows || (entityType === "enemy" && (y > game.enemyBoundary || !noEnemyCollision()))) {
+    if(x < 0 || x >= game.cols || y < 0 || y >= game.rows || (entityType === "enemy" && (y > game.enemyBoundary || enemyCollision(x, y, movingObject)))) {
       return false; // Return false if this is an invalid movement
     }
   }
   return true; // If we make it through the checks, then we return true because this movement is valid and acceptable.
 
   // Unlike players, enemy units are not allowed to move into other objects, so we need additional checks before they move using this helper function
-  function noEnemyCollision(x, y) {
-    return true;
+  function enemyCollision(x, y, enemy) {
+    const type = enemy.type;
+    // Cycle through every object type and check if they exist in grid x,y. If an enemy exists, we must check if it's the same enemy calling this function, because we don't want it to self trigger.
+    for(const objectType of game.objectTypes) {
+      if((objectType === "enemy" && grid.cell[x][y][type].index !== enemy.index) || grid.cell[x][y][objectType] !== null) {
+        return true;
+      }
+    }
+    return false;
   }
 }
 
@@ -363,17 +382,17 @@ function shootLaser(entity) {
   // Create laser object
   const laserArray = entity.laserArray;
   const laserClass = entity.laserClass;
-  let index = laserArray.indexOf(null);
-  if(index === -1) {
-    laserArray.push(new laserClass());
-    index = laserArray.length-1; // Updates the index
+  let index = laserArray.indexOf(null); // Sets index to the first instance of null in the laserArray
+  if(index === -1) { // If there is no null in the arary,
+    laserArray.push(new laserClass()); // push this laser object to the array
+    index = laserArray.length-1; // Updates the index value
   } else {
-    laserArray[index] = new laserClass();
+    laserArray[index] = new laserClass(); // otherwise if null was found, we create the laser object at the null index
   }
-  entity.laserCount++;
-  laserArray[index].index = index; // Stores the index that the laser object occupies in the array it exists in
+  entity.laserCount++; // Increment the laser count for the entity that shot this laser. This is for entities that shoot more than one laser at a time.
+  laserArray[index].index = index; // Stores the index that the laser object occupies in the array it exists in to a property of the laser object
   laserArray[index].homeArray = laserArray; // Stores a self reference to the array that the laser object exists in
-  laserArray[index].spawnLaser(entity.laserCount); // Creates the laser on the grid and starts moving it. Parameter is for entities that shoot multiple lasers at once.
+  laserArray[index].renderLaser(entity); // Creates the laser on the grid and starts moving it. Parameter is enemy objects to grab the position of the entity that shot it as well as the entity.laserCount for entities that shoot multiple lasers.
   // Check for entities that can fire multiple lasers at once.
   if(entity.laserCount < entity.concurrentLasers) {
     shootLaser(entity); // If we need to shoot another laser because this entity can shoot multiple at once, we recursively call the shoot laser function
