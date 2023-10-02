@@ -25,7 +25,7 @@ const playerLives = 3;
 const playerConcurrentLasers = 1;
 const playerEntityType = "player";
 const playerDefaultColorClass = "player-entity"; // We change the colorClass property of the player when it flashes due to damage being taken, so we can restore its default class by referencing this.
-const playerLaserSpeed = 25;
+const playerLaserSpeed = 10;
 const playerLaserDamage = 10;
 const playerLaserType = "playerLaser";
 const playerLaserColorClass = "playerLaser";
@@ -65,14 +65,50 @@ const enemyTypeOneSpawnLocations = [ // A 2D array storing all possible spawn po
 class Enemy {
   constructor() {
     this.position = [];
-    this.homeArray = game.enemies;
-    this.laserArray = game.enemyLasers;
+    this.homeArray = game.enemies; // Home array is needed for the function that deletes objects. Every non-player object must have a homeArray
+    this.laserArray = game.enemyLasers; // The array that stores player laser objects when they're created. This is used in the shootLaser function to add homeArray to laserObjects.
     this.attackInterval;
     this.movementInterval;
     this.index = null;
     this.type = enemyType;
-    this.movementPatternIndex = [];
-    this.movementPatternStepIndex = [];
+    this.movementPatternIndex = 0;
+    this.movementPatternStepIndex = 0;
+  }
+
+  spawn() {
+    console.log("Spawn called");
+    const max = this.spawnLocations.length-1;
+    const randomIndex = randomNum(0, max);
+    this.position = this.spawnLocations[randomIndex];
+    render("draw", this);
+    this.getNewMovementPattern();
+  }
+
+  getNewMovementPattern() {
+    console.log("Get new pattern called");
+    this.movementPatternStepIndex = 0; // Reset the step index
+    clearInterval(this.movementInterval);
+    const max = this.movementPatterns.length-1;
+    const randomIndex = randomNum(0, max);
+    this.movementPatternIndex = randomIndex;
+    this.movementInterval = setInterval(() => this.move(), this.movementSpeed);
+  }
+
+  move() {
+    console.log("Move called");
+    const patternIndex = this.movementPatternIndex;
+    const stepIndex = this.movementPatternStepIndex;
+    const adj = this.movementDistance;
+    const dx = this.movementPatterns[patternIndex][stepIndex][0] * adj;
+    const dy = this.movementPatterns[patternIndex][stepIndex][1] * adj;
+    if(isValidMove(dx, dy, this)) { // Check if the updated positon is a valid movement
+      moveObject(dx, dy, this); // Move to the new position if it's within grid boundaries
+    }
+    stepIndex >= this.movementPatterns[patternIndex].length-1 ? this.getNewMovementPattern() : this.movementPatternStepIndex++;
+  }
+
+  startShooting() {
+    this.attackInterval = setInterval(() => shootLaser(this), this.attackSpeed);
   }
 }
 
@@ -81,6 +117,7 @@ class EnemyTypeOne extends Enemy {
     super();
     this.health = enemyTypeOneHealth;
     this.movementSpeed = enemyTypeOneMovementSpeed;
+    this.attackSpeed = enemyTypeOneAttackSpeed;
     this.movementDistance = enemyTypeOneMovementDistance;
     this.colorClass = enemyTypeOneColorClass;
     this.movementPatterns = enemyTypeOneMovementPatterns;
@@ -88,10 +125,6 @@ class EnemyTypeOne extends Enemy {
     this.laserMax = enemyTypeOneLaserMax;
     this.laserCount = 0;
     this.laserClass = EnemyTypeOneLaser;
-  }
-
-  spawn() {
-    render("draw", this);
   }
 }
 
@@ -115,7 +148,7 @@ class Player {
     this.colorClass = playerDefaultColorClass;
     this.defaultColorClass = playerDefaultColorClass; // So we can modularize the damage flashing
     this.index = 1; // Used to store this value on the cell to signify the player occupies the cell. This is called index just for modularity, because other objects use indexes.
-    this.laserArray = game.playerLasers; // The array that stores player laser objects when they're created.
+    this.laserArray = game.playerLasers; // The array that stores player laser objects when they're created. This is used in the shootLaser function to add homeArray to laserObjects.
   }
 
   spawn() {
@@ -141,12 +174,12 @@ class Laser {
     }
   // Starts the moving interval that repeatedly calls the this.move() method to move the laser.
   startMoveInterval() {
-    this.moveInterval = setInterval(() => this.move(), this.speed);
-  }
-  // The function that actually moves the laser and checks if each movement is valid before the move is executed. Deletes the laser object if a collision occurs.
-  move() {
     const dx = this.direction[0];
     const dy = this.direction[1];
+    this.moveInterval = setInterval(() => this.move(dx, dy), this.speed);
+  }
+  // The function that actually moves the laser and checks if each movement is valid before the move is executed. Deletes the laser object if a collision occurs.
+  move(dx, dy) {
     if(isValidMove(dx, dy, this)) {
       moveObject(dx, dy, this);
       // call modular laser collision check function here AFTER moving
@@ -244,7 +277,7 @@ class Game {
     this.deathFlashSpeed = deathFlashSpeed; // The flash speed in milliseconds.
     this.spawnFlashes = spawnFlashes; // How many times the player flashes when they spawn.
     this.spawnFlashSpeed = spawnFlashSpeed; // The spawn flash speed in milliseconds.
-    this.enemyTypes = [EnemyTypeOne, EnemyTypeTwo]; // Stores references to each enemy class type. Used for spawning a random enemy type.
+    this.enemyTypes = [EnemyTypeOne]; // Stores references to each enemy class type. Used for spawning a random enemy type.
     this.playerLasers = [];
     this.enemyLasers = [];
     this.enemies = [...enemyArray]; // Copies the enemyArray from setup.
@@ -319,7 +352,13 @@ function spawnRandomEnemy() {
     return; // Return if there are no empty spots to spawn an enemy in the enemies array
   }
   const index = game.enemies.indexOf(null); // Grab the index of the empty spot in the array
-  // do stuff
+  const randomIndex = randomNum(0, game.enemyTypes.length-1); // Gets a random index for the enemy types array.
+  const randomEnemyClass = game.enemyTypes[randomIndex];
+  game.enemies[index] = new randomEnemyClass();
+  const enemy = game.enemies[index];
+  enemy.index = index;
+  enemy.spawn();
+  enemy.startShooting();
 }
 
 
@@ -337,6 +376,7 @@ function moveObject(dx, dy, movingObject) {
 
 // Handles rendering or unrendering objects from the grid. I could use a single loop and while updating the position in the moveObject function, send the coordinates over to be drawn/undrawn, however, keeping them separate allows me to use the render function separately from the move function, such as when spawning objects.
 function render(action, renderingObject) {
+  console.log("Render called");
   const colorClass = renderingObject.colorClass;
   const objectType = renderingObject.type;
   const position = renderingObject.position;
@@ -359,7 +399,7 @@ function isValidMove(dx, dy, movingObject) {
   for(const coords of position) {
     const x = coords[0] + dx;
     const y = coords[1] + dy;
-    if(x < 0 || x >= game.cols || y < 0 || y >= game.rows || (entityType === "enemy" && (y > game.enemyBoundary || enemyCollision(x, y, movingObject)))) {
+    if(x < 0 || x >= game.cols || y < 0 || y >= game.rows || (entityType === "enemy" && (y > game.enemyBoundary || enemyCollision(x, y, movingObject) || grid.cell[x][y].enemy !== null && grid.cell[x][y].enemy.index === movingObject.index))) {
       return false; // Return false if this is an invalid movement
     }
   }
@@ -367,10 +407,9 @@ function isValidMove(dx, dy, movingObject) {
 
   // Unlike players, enemy units are not allowed to move into other objects, so we need additional checks before they move using this helper function
   function enemyCollision(x, y, enemy) {
-    const type = enemy.type;
     // Cycle through every object type and check if they exist in grid x,y. If an enemy exists, we must check if it's the same enemy calling this function, because we don't want it to self trigger.
     for(const objectType of game.objectTypes) {
-      if((objectType === "enemy" && grid.cell[x][y][type].index !== enemy.index) || grid.cell[x][y][objectType] !== null) {
+      if(objectType !== "enemy" && grid.cell[x][y][objectType] !== null) {
         return true;
       }
     }
@@ -401,6 +440,10 @@ function shootLaser(entity) {
   }
 }
 
+function randomNum(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
 // Function for removing non-player objects from the game
 function deleteObject(objectToDelete) {
   const objectArray = objectToDelete.homeArray;// Stores a reference to the array this object exists in
@@ -413,7 +456,7 @@ function deleteObject(objectToDelete) {
   objectArray[index] = null;
 }
 
-// Separate function for clearing intervals so when we reset the game we can simply clear intervals rather than run through the entire object deletion process (since we'll be creating a new Game instance anyhow)
+// Separate function for clearing intervals so when we reset the game we can simply clear intervals rather than run through the entire object deletion process (since we'll be creating a new Game and grid/cell instance(s) which will delete all objects)
 function clearObjectIntervals(objectToDelete) {
   if(objectToDelete.moveInterval) {
     clearInterval(objectToDelete.moveInterval);
