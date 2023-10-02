@@ -1,14 +1,9 @@
-/*
-unrender
-ternary if to swap between damage class and default class
-render
-*/
-
 // Game Settings
 const maxRows = 100;
 const maxCols = 100;
 const laserCooldown = 300; // Player laser coolddown in milliseconds.
 const enemyBoundary = 36; // The row enemies are unable to go below.
+const damageDisplayDuration = 1000; // How long the damage indication is displayed for
 const deathFlashes = 10; // How many times an entity flashes when it dies.
 const deathFlashSpeed = 200; // The flash speed in milliseconds.
 const spawnFlashes = 4; // How many times the player flashes when they spawn.
@@ -19,6 +14,7 @@ const damagedColorClass = "damage-taken";
 
 // Player Settings
 const playerHealth = 50;
+const playerCollisionDamage = 100;
 const playerMoveSpeed = 20; // The cooldown in milliseconds for how fast the player can move again after moving.
 const playerMoveDistance = 5; // How many cells the player moves per movement.
 const playerSpawnLocation = [[50, 90], [49, 91], [50, 91], [51, 91], [48, 92], [49, 92], [50, 92], [51, 92], [52, 92], [48, 93], [49, 93], [51, 93], [52, 93], [48, 94], [52, 94]];
@@ -30,13 +26,15 @@ const playerLaserSpeed = 10;
 const playerLaserDamage = 10;
 const playerLaserType = "playerLaser";
 const playerLaserColorClass = "playerLaser";
-const playerLaserCanDamageTypes = ["debris", "enemy"];
+const playerCanCollideWith = ["enemy"];
+const playerLaserCanCollideWith = ["debris", "enemy", "enemyLaser"];
 
 // Enemy Settings
 const enemyType = "enemy";
 const enemyLaserColorClass = "enemyLaser";
 const enemyLaserType = "enemyLaser";
-const enemyLaserCanDamageTypes = ["debris", "player"]; // the types of objects that an enemy laser can damage
+const enemyLaserCanCollideWith = ["debris", "player"]; // the types of objects that an enemy laser can damage
+const enemyCollisionDamage = 100;
 
 // Enemy Type One
 const enemyTypeOneHealth = 30;
@@ -68,6 +66,8 @@ const enemyTypeOneSpawnLocations = [ // A 2D array storing all possible spawn po
 // These initiatations aren't entirely necessary but they help remind me of functionality I'll be using.
 class Enemy {
   constructor() {
+    this.alive = true;
+    this.collisionDamage = enemyCollisionDamage;
     this.position = [];
     this.homeArray = game.enemies; // Home array is needed for the function that deletes objects. Every non-player object must have a homeArray
     this.laserArray = game.enemyLasers; // The array that stores player laser objects when they're created. This is used in the shootLaser function to add homeArray to laserObjects.
@@ -77,6 +77,7 @@ class Enemy {
     this.type = enemyType;
     this.movementPatternIndex = 0;
     this.movementPatternStepIndex = 0;
+    this.timeOut = null;
   }
 
   spawn() {
@@ -110,6 +111,17 @@ class Enemy {
   startShooting() {
     this.attackInterval = setInterval(() => shootLaser(this), this.attackSpeed);
   }
+
+  collision(damage) {
+    this.health -= damage;
+    // Change this later
+    if(this.health <= 0 && this.alive) {
+      this.alive = false;
+      deleteObject(this);
+    } else {
+      damageTakenAnimation(this);
+    }
+  }
 }
 
 class EnemyTypeOne extends Enemy {
@@ -120,6 +132,7 @@ class EnemyTypeOne extends Enemy {
     this.attackSpeed = enemyTypeOneAttackSpeed;
     this.movementDistance = enemyTypeOneMovementDistance;
     this.colorClass = enemyTypeOneColorClass;
+    this.defaultColorClass = enemyTypeOneDefaultColorClass;
     this.movementPatterns = enemyTypeOneMovementPatterns;
     this.spawnLocations = enemyTypeOneSpawnLocations;
     this.laserMax = enemyTypeOneLaserMax;
@@ -136,6 +149,7 @@ class Player {
   constructor() {
     this.type = playerEntityType;
     this.health = playerHealth;
+    this.collisionDamage = playerCollisionDamage;
     this.movementSpeed = playerMoveSpeed;
     this.moveDistance = playerMoveDistance;
     this.position = structuredClone(playerSpawnLocation); // Clones the PLAYER_SPAWN_LOCATION array.
@@ -147,18 +161,29 @@ class Player {
     this.concurrentLasers = playerConcurrentLasers;
     this.colorClass = playerDefaultColorClass;
     this.defaultColorClass = playerDefaultColorClass; // So we can modularize the damage flashing
-    this.index = 1; // Used to store this value on the cell to signify the player occupies the cell. This is called index just for modularity, because other objects use indexes.
     this.laserArray = game.playerLasers; // The array that stores player laser objects when they're created. This is used in the shootLaser function to add homeArray to laserObjects.
+    this.timeOut = null;
   }
 
   spawn() {
     render("draw", this);
   }
+
+  collision(damage) {
+    this.health -= damage;
+    if(this.health <= 0 && this.alive) {
+      this.alive = false;
+      // handle player death here
+      alert("YOU DEAD BRUH");
+    } else {
+      damageTakenAnimation(this);
+    }
+  }
 }
 
 class Laser {
   constructor() {
-    this.moveInterval; // The lasers movement interval is stored here.
+    this.movementInterval; // The lasers movement interval is stored here.
     this.position;
     this.index = null; // Holds the index where this laser object exists within its home array.
   }
@@ -176,16 +201,20 @@ class Laser {
   startMoveInterval() {
     const dx = this.direction[0];
     const dy = this.direction[1];
-    this.moveInterval = setInterval(() => this.move(dx, dy), this.speed);
+    this.movementInterval = setInterval(() => this.move(dx, dy), this.speed);
   }
   // The function that actually moves the laser and checks if each movement is valid before the move is executed. Deletes the laser object if a collision occurs.
   move(dx, dy) {
     if(isValidMove(dx, dy, this)) {
       moveObject(dx, dy, this);
-      laserCollisionCheck(this);
+      objectCollisionCheck(this);
     } else {
       deleteObject(this);
     }
+  }
+
+  collision() {
+    deleteObject(this);
   }
 }
 
@@ -196,16 +225,15 @@ class EnemyLaser extends Laser {
     this.colorClass = enemyLaserColorClass;
     this.type = enemyLaserType;
     this.index = null;
-    this.moveInterval;
     this.direction = [0, 1]; // Down
-    this.laserCanDamageTypes = enemyLaserCanDamageTypes;
+    this.canCollideWith = enemyLaserCanCollideWith;
   }
 }
 
 class EnemyTypeOneLaser extends EnemyLaser {
   constructor() {
     super();
-    this.damage = enemyTypeOneLaserDamage;
+    this.collisionDamage = enemyTypeOneLaserDamage;
     this.speed = enemyTypeOneLaserSpeed;
     this.laserStartPoint = 0;
   }
@@ -225,12 +253,12 @@ class PlayerLaser extends Laser {
     super();
     this.type = playerLaserType;
     this.speed = playerLaserSpeed; // How often the laser move function is called in milliseconds.
-    this.damage = playerLaserDamage;
+    this.collisionDamage = playerLaserDamage;
     this.colorClass = playerLaserColorClass;
     this.direction = [0, -1]; // Up
     this.index = null;
     this.laserStartPoint = 0; // Index of the player position array for the object piece that the laser shoots from
-    this.laserCanDamageTypes = playerLaserCanDamageTypes; // The types of objects that a player laser can damage.
+    this.canCollideWith = playerLaserCanCollideWith; // The types of objects that a player laser can damage.
   }
 }
 
@@ -271,6 +299,7 @@ class Grid {
   }
 }
 
+// We'll clean this up later and only copy values that we plan on changing later. Anything that does remain constant will be directly referenced instead of copied into the game object and then referenced.
 class Game {
   constructor() {
     this.rows = maxRows;
@@ -288,6 +317,8 @@ class Game {
     this.debris = [];
     this.enemySpawnInterval;
     this.objectTypes = objectTypes;
+    this.damageDisplayDuration = damageDisplayDuration;
+    this.damagedColorClass = damagedColorClass;
   }
 }
 
@@ -324,7 +355,6 @@ document.addEventListener("keydown", event => {
     let dx;
     let dy;
     if (event.code === "ArrowLeft") {
-      console.log("Left triggered");
       dx = -1;
       dy = 0;
     } else if(event.code === "ArrowRight") {
@@ -444,20 +474,39 @@ function shootLaser(entity) {
   }
 }
 
-// Modular laser collision check function that takes the laserCanDamageTypes array, cycles through it and checks if the laser has collided with any of these object types.
-function laserCollisionCheck(laser) {
-  const objectTypes = laser.laserCanDamageTypes;
-  const position = laser.position;
+function objectCollisionCheck(objectThatHit) {
+  const objectTypes = objectThatHit.canCollideWith;
+  const position = objectThatHit.position;
   for(const coords of position) { // Cycles through the coordinates of every segment of the laser object
     const x = coords[0];
     const y = coords[1];
-    for(const type of objectTypes) { // Cycles through each object type that this laser can collide with and checks it against the current laser coordinate
+    for(const type of objectTypes) { // Cycles through each object type that this laser can collide with and checks it against the current object coordinate
       if(grid.cell[x][y][type] !== null) {
-        deleteObject(laser); // This will be handled later, here we can deal damage to the the object that was hit and call a "takeDamage" method on the object or call a function and send the object.
+        console.log(`Collision detected on cell ${x}, ${y}`);
+        console.log(grid.cell[x][y]);
+        const objectThatWasHit = grid.cell[x][y][type];
+        const returnDamage = objectThatWasHit.collisionDamage;
+        const givenDamage = objectThatHit.collisionDamage;
+        console.log("The object doing the colliding");
+        console.log(objectThatHit);
+        console.log("Object that was hit");
+        console.log(objectThatWasHit);
+        objectThatHit.collision(returnDamage);
+        objectThatWasHit.collision(givenDamage);
+        return; // Stop the iteration, otherwise we'll trigger multiple collisions when there should only be one.
       }
     }
   }
+}
 
+function damageTakenAnimation(entity) {
+  console.log("Damage taken called");
+  render("undraw", entity);
+  entity.colorClass === game.damagedColorClass ? entity.colorClass = entity.defaultColorClass : entity.colorClass = game.damagedColorClass;
+  render("draw", entity);
+  if(entity.colorClass === game.damagedColorClass) {
+    entity.timeOut = setTimeout(() => damageTakenAnimation(entity), game.damageDisplayDuration); // Call the function again to change the color back
+  }
 }
 
 function randomNum(min, max) {
@@ -466,6 +515,10 @@ function randomNum(min, max) {
 
 // Function for removing non-player objects from the game
 function deleteObject(objectToDelete) {
+  if(objectToDelete.type === "enemy") {
+    console.log("Delete object called on");
+    console.log(objectToDelete);
+  }
   const objectArray = objectToDelete.homeArray;// Stores a reference to the array this object exists in
   const index = objectToDelete.index; // Stores the index the object occupies of the array it exists in
   // Clear any intervals attached to this object if they exist.
@@ -478,10 +531,14 @@ function deleteObject(objectToDelete) {
 
 // Separate function for clearing intervals so when we reset the game we can simply clear intervals rather than run through the entire object deletion process (since we'll be creating a new Game and grid/cell instance(s) which will delete all objects)
 function clearObjectIntervals(objectToDelete) {
-  if(objectToDelete.moveInterval) {
-    clearInterval(objectToDelete.moveInterval);
+  if(objectToDelete.movementInterval) {
+    clearInterval(objectToDelete.movementInterval);
   }
   if(objectToDelete.attackInterval) {
     clearInterval(objectToDelete.attackInterval);
+  }
+  if(objectToDelete.timeOut) {
+    console.log("Timeout detected and being removed");
+    clearTimeout(objectToDelete.timeOut);
   }
 }
