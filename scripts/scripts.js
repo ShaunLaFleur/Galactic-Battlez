@@ -15,6 +15,7 @@ const spawnFlashes = 4; // How many times the player flashes when they spawn.
 const spawnFlashSpeed = 500; // The spawn flash speed in milliseconds.
 const enemyArray = [null, null, null]; // Defines how many enemies can exist at once. Enemies can only be spawned if null exists in the array, they are not added to the array otherwwise.
 const objectTypes = ["player", "playerLaser", "enemy", "enemyLaser"] // Used to initiate the cell object parameters that we need to set as null
+const damagedColorClass = "damage-taken";
 
 // Player Settings
 const playerHealth = 50;
@@ -41,6 +42,7 @@ const enemyTypeOneMovementSpeed = 1200;
 const enemyTypeOneMovementDistance = 8;
 const enemyTypeOneAttackSpeed = 1500;
 const enemyTypeOneColorClass = "enemy-entity";
+const enemyTypeOneDefaultColorClass = "enemy-entity";
 const enemyTypeOneLaserMax = 1;
 const enemyTypeOneLaserDamage = 10;
 const enemyTypeOneLaserSpeed = 10;
@@ -89,8 +91,7 @@ class Enemy {
     this.movementPatternStepIndex = 0; // Reset the step index
     clearInterval(this.movementInterval);
     const max = this.movementPatterns.length-1;
-    const randomIndex = randomNum(0, max);
-    this.movementPatternIndex = randomIndex;
+    this.movementPatternIndex = randomNum(0, max);
     this.movementInterval = setInterval(() => this.move(), this.movementSpeed);
   }
 
@@ -213,6 +214,8 @@ class EnemyTypeOneLaser extends EnemyLaser {
 class EnemyTypeTwoLaser extends EnemyLaser {
   constructor() {
     super();
+    this.laserStartPoint = 0;
+    this.laserStartPoint2 = 1;
   }
 
 }
@@ -399,7 +402,7 @@ function isValidMove(dx, dy, movingObject) {
   for(const coords of position) {
     const x = coords[0] + dx;
     const y = coords[1] + dy;
-    if(x < 0 || x >= game.cols || y < 0 || y >= game.rows || (entityType === "enemy" && (y > game.enemyBoundary || enemyCollision(x, y, movingObject) || grid.cell[x][y].enemy !== null && grid.cell[x][y].enemy.index === movingObject.index))) {
+    if(x < 0 || x >= game.cols || y < 0 || y >= game.rows || (entityType === "enemy" && (y > game.enemyBoundary || enemyCollision(x, y, movingObject) || grid.cell[x][y].enemy !== null && grid.cell[x][y].enemy.index !== movingObject.index))) {
       return false; // Return false if this is an invalid movement
     }
   }
