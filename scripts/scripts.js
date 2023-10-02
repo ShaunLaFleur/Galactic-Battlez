@@ -402,7 +402,7 @@ function isValidMove(dx, dy, movingObject) {
   for(const coords of position) {
     const x = coords[0] + dx;
     const y = coords[1] + dy;
-    if(x < 0 || x >= game.cols || y < 0 || y >= game.rows || (entityType === "enemy" && (y > game.enemyBoundary || enemyCollision(x, y, movingObject) || grid.cell[x][y].enemy !== null && grid.cell[x][y].enemy.index !== movingObject.index))) {
+    if(x < 0 || x >= game.cols || y < 0 || y >= game.rows || (entityType === "enemy" && (y > game.enemyBoundary || enemyCollision(x, y, movingObject)))) {
       return false; // Return false if this is an invalid movement
     }
   }
@@ -412,7 +412,7 @@ function isValidMove(dx, dy, movingObject) {
   function enemyCollision(x, y, enemy) {
     // Cycle through every object type and check if they exist in grid x,y. If an enemy exists, we must check if it's the same enemy calling this function, because we don't want it to self trigger.
     for(const objectType of game.objectTypes) {
-      if(objectType !== "enemy" && grid.cell[x][y][objectType] !== null) {
+      if((objectType !== "enemy" && grid.cell[x][y][objectType] !== null) || (objectType === "enemy" && grid.cell[x][y].enemy !== null && grid.cell[x][y].enemy.index !== enemy.index)) {
         return true;
       }
     }
