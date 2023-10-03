@@ -8,13 +8,13 @@ const deathFlashes = 10; // How many times an entity flashes when it dies.
 const deathFlashSpeed = 200; // The flash speed in milliseconds.
 const spawnFlashes = 4; // How many times the player flashes when they spawn.
 const spawnFlashSpeed = 500; // The spawn flash speed in milliseconds.
-const enemyArray = [null, null, null]; // Defines how many enemies can exist at once. Enemies can only be spawned if null exists in the array, they are not added to the array otherwwise.
+const enemyArray = [null, null, null]; // Defines how many enemies can exist at once. Enemies can only be spawned at an index containing null, they are not added to the array otherwwise.
 const objectTypes = ["player", "playerLaser", "enemy", "enemyLaser", "debris"] // Used to initiate the cell object parameters that we need to set as null
 const damagedColorClass = "damage-taken";
 
 // Player Settings
 const playerHealth = 50;
-const playerCollisionDamage = 100;
+const playerCollisionDamage = 100; // The amount of damage this object does to any objects that collide with it.
 const playerMoveSpeed = 20; // The cooldown in milliseconds for how fast the player can move again after moving.
 const playerMoveDistance = 5; // How many cells the player moves per movement.
 const playerSpawnLocation = [[50, 90], [49, 91], [50, 91], [51, 91], [48, 92], [49, 92], [50, 92], [51, 92], [52, 92], [48, 93], [49, 93], [51, 93], [52, 93], [48, 94], [52, 94]];
@@ -78,12 +78,20 @@ class Enemy {
     this.movementPatternIndex = 0;
     this.movementPatternStepIndex = 0;
     this.timeOut = null;
+    this.deathTimer;
   }
 
   spawn() {
-    const max = this.spawnLocations.length-1;
-    const randomIndex = randomNum(0, max);
-    this.position = this.spawnLocations[randomIndex];
+    let foundValidSpawn = false;
+    while(!foundValidSpawn) {
+      const max = this.spawnLocations.length-1;
+      const randomIndex = randomNum(0, max);
+      this.position = structuredClone(this.spawnLocations[randomIndex]);
+      console.log(randomIndex);
+      if(isValidMove(0, 0, this)) {
+        foundValidSpawn = true;
+      }
+    }
     render("draw", this);
     this.getNewMovementPattern();
   }
@@ -94,6 +102,7 @@ class Enemy {
     const max = this.movementPatterns.length-1;
     this.movementPatternIndex = randomNum(0, max);
     this.movementInterval = setInterval(() => this.move(), this.movementSpeed);
+    game.timers.push(this.movementInterval);
   }
 
   move() {
@@ -102,7 +111,7 @@ class Enemy {
     const adj = this.movementDistance;
     const dx = this.movementPatterns[patternIndex][stepIndex][0] * adj;
     const dy = this.movementPatterns[patternIndex][stepIndex][1] * adj;
-    if(isValidMove(dx, dy, this)) { // Check if the updated positon is a valid movement
+    if(isValidMove(dx, dy, this) && this.alive) { // Check if the updated positon is a valid movement
       moveObject(dx, dy, this); // Move to the new position if it's within grid boundaries
     }
     stepIndex >= this.movementPatterns[patternIndex].length-1 ? this.getNewMovementPattern() : this.movementPatternStepIndex++;
@@ -110,6 +119,7 @@ class Enemy {
 
   startShooting() {
     this.attackInterval = setInterval(() => shootLaser(this), this.attackSpeed);
+    game.timers.push(this.attackInterval);
   }
 
   collision(damage) {
@@ -117,7 +127,7 @@ class Enemy {
     // Change this later
     if(this.health <= 0 && this.alive) {
       this.alive = false;
-      deleteObject(this);
+      deathAnimation(this);
     } else {
       damageTakenAnimation(this);
     }
@@ -148,12 +158,12 @@ class EnemyTypeTwo extends Enemy {
 class Player {
   constructor() {
     this.type = playerEntityType;
-    this.health = playerHealth;
     this.collisionDamage = playerCollisionDamage;
+    this.canCollideWith = playerCanCollideWith;
     this.movementSpeed = playerMoveSpeed;
     this.moveDistance = playerMoveDistance;
-    this.position = structuredClone(playerSpawnLocation); // Clones the PLAYER_SPAWN_LOCATION array.
-    this.alive = true;
+    this.position = [];
+    this.alive = false;
     this.lives = playerLives;
     this.laserCooldown = false;
     this.laserClass = PlayerLaser;
@@ -163,21 +173,39 @@ class Player {
     this.defaultColorClass = playerDefaultColorClass; // So we can modularize the damage flashing
     this.laserArray = game.playerLasers; // The array that stores player laser objects when they're created. This is used in the shootLaser function to add homeArray to laserObjects.
     this.timeOut = null;
+    this.deathTimer;
   }
 
   spawn() {
+    this.health = playerHealth;
+    this.updateHealth();
+    this.position = structuredClone(playerSpawnLocation);
+    this.alive = true;
+    this.colorClass = this.defaultColorClass;
     render("draw", this);
   }
 
   collision(damage) {
     this.health -= damage;
+    this.updateHealth();
     if(this.health <= 0 && this.alive) {
       this.alive = false;
-      // handle player death here
-      alert("YOU DEAD BRUH");
+      this.lives--;
+      const livesElement = document.getElementById("lives");
+      livesElement.innerHTML = this.lives;
+      if(this.lives === 0) {
+        gameOver();
+      } else {
+        deathAnimation(this);
+      }
     } else {
       damageTakenAnimation(this);
     }
+  }
+
+  updateHealth() {
+    const healthElement = document.getElementById("health");
+    healthElement.innerHTML = this.health;
   }
 }
 
@@ -202,6 +230,7 @@ class Laser {
     const dx = this.direction[0];
     const dy = this.direction[1];
     this.movementInterval = setInterval(() => this.move(dx, dy), this.speed);
+    game.timers.push(this.movementInterval);
   }
   // The function that actually moves the laser and checks if each movement is valid before the move is executed. Deletes the laser object if a collision occurs.
   move(dx, dy) {
@@ -299,7 +328,7 @@ class Grid {
   }
 }
 
-// We'll clean this up later and only copy values that we plan on changing later. Anything that does remain constant will be directly referenced instead of copied into the game object and then referenced.
+// We'll clean this up later and only copy values that we plan on changing. Anything that actually remains constant will be directly referenced instead of copied into the game object and then referenced.
 class Game {
   constructor() {
     this.rows = maxRows;
@@ -315,7 +344,9 @@ class Game {
     this.enemyLasers = [];
     this.enemies = [...enemyArray]; // Copies the enemyArray from setup.
     this.debris = [];
+    this.timers = []; // Store all interval and timeout IDs to clearing during game reset.
     this.enemySpawnInterval;
+    this.debrisSpawnInterval;
     this.objectTypes = objectTypes;
     this.damageDisplayDuration = damageDisplayDuration;
     this.damagedColorClass = damagedColorClass;
@@ -350,8 +381,7 @@ document.addEventListener("keydown", event => {
   console.log("Event listener triggered");
   if(event.code === "Space" && !player.laserCooldown) {
     shootLaser(player);
-
-  } else {
+  } else if(player.alive) {
     let dx;
     let dy;
     if (event.code === "ArrowLeft") {
@@ -374,7 +404,7 @@ document.addEventListener("keydown", event => {
       dy *= adj;
       if(isValidMove(dx, dy, player)) { // Check if the updated positon is a valid movement
         moveObject(dx, dy, player); // Move to the new position if it's within grid boundaries
-        // check player collisions after moving
+        objectCollisionCheck(player);
       }
     }
   }
@@ -452,6 +482,9 @@ function isValidMove(dx, dy, movingObject) {
 }
 
 function shootLaser(entity) {
+  if(!entity.alive) {
+    return;
+  }
   // Create laser object
   const laserArray = entity.laserArray;
   const laserClass = entity.laserClass;
@@ -513,6 +546,32 @@ function randomNum(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
+function deathAnimation(entity) {
+  let flash = 0;
+  render("undraw", entity); // Remove the current color from the grid
+  // Remove half of the object's position coordinates to make it appear damaged
+  for(let i = 0; i < entity.position.length; i++) {
+    if(i % 2 === 0) {
+      entity.position.splice(1,2);
+    }
+  }
+  entity.colorClass = game.damagedColorClass; // Update the color class
+  entity.deathTimer = setInterval(() => deathFlash(entity, flash++), game.deathFlashSpeed); // Start flashing the object on and off the grid with the new color
+  game.timers.push(entity.deathTimer);
+
+  function deathFlash(entity) {
+    flash % 2 === 0 ? render("undraw", entity) : render("draw", entity);
+    if(flash >= game.deathFlashes) {
+      clearInterval(entity.deathTimer);
+      if(entity.type !== "player") {
+        deleteObject(entity);
+      } else {
+        entity.spawn();
+      }
+    }
+  }
+}
+
 // Function for removing non-player objects from the game
 function deleteObject(objectToDelete) {
   if(objectToDelete.type === "enemy") {
@@ -540,5 +599,15 @@ function clearObjectIntervals(objectToDelete) {
   if(objectToDelete.timeOut) {
     console.log("Timeout detected and being removed");
     clearTimeout(objectToDelete.timeOut);
+  }
+}
+
+function gameOver() {
+  alert("You've run out of lives. GAME OVER");
+}
+
+function clearAllTimers() {
+  for(const timer of game.timers) {
+    clearInterval(timer);
   }
 }
