@@ -8,7 +8,7 @@ const deathFlashes = 10; // How many times an entity flashes when it dies.
 const deathFlashSpeed = 200; // The flash speed in milliseconds.
 const spawnFlashes = 4; // How many times the player flashes when they spawn.
 const spawnFlashSpeed = 500; // The spawn flash speed in milliseconds.
-const enemyArray = [null, null, null]; // Defines how many enemies can exist at once. Enemies can only be spawned at an index containing null, they are not added to the array otherwwise.
+const enemyArray = [null, null]; // Defines how many enemies can exist at once. Enemies can only be spawned at an index containing null, they are not added to the array otherwwise.
 const objectTypes = ["player", "playerLaser", "enemy", "enemyLaser", "debris"] // Used to initiate the cell object parameters that we need to set as null
 const damagedColorClass = "damage-taken";
 
@@ -221,7 +221,7 @@ class Laser {
       const index = this.laserStartPoint; // Get the index for the segment of the shooting object that the laser will fire out of
       const x = shootingEntity.position[index][0]; // Grab the x coordinate of the segment
       const y = shootingEntity.position[index][1]; // Grab the y coordiante of the segment
-      this.position = [[x, y+dy], [x, y+(dy*2)], [x, y+(dy*3)]]; // Adjust the lasers location above or below (depending on direction) the segment it fires from.
+      this.position = [[x, y+dy], [x, y+(dy*2)], [x, y+(dy*3)]]; // Adjust the lasers location above or below (depending on direction) the segment it fires from. May need to be modulated later with a "getLaserPosition" function later. If we do this, then we can do away with the "laserStartPoint" parameter on objects and just fully customize the laser start point methods on each laser class. This would also be better for double/triple lasers overall as we can return differnet positions depending on laserCount.
       render("draw", this); // Render the object on the grid
       this.startMoveInterval(); // Start moving the laser in the direction
     }
@@ -331,6 +331,7 @@ class Grid {
 // We'll clean this up later and only copy values that we plan on changing. Anything that actually remains constant will be directly referenced instead of copied into the game object and then referenced.
 class Game {
   constructor() {
+    this.started = false;
     this.rows = maxRows;
     this.cols = maxCols;
     this.laserCooldown = laserCooldown; // Player laser coolddown in milliseconds.
@@ -347,7 +348,6 @@ class Game {
     this.timers = []; // Store all interval and timeout IDs to clearing during game reset.
     this.enemySpawnInterval;
     this.debrisSpawnInterval;
-    this.objectTypes = objectTypes;
     this.damageDisplayDuration = damageDisplayDuration;
     this.damagedColorClass = damagedColorClass;
   }
@@ -356,7 +356,7 @@ class Game {
 /* -- End Class & Method Setup -- */
 
 let game = new Game(); // Start a new game instance
-let player = new Player(); // Create a new player instance.
+let player = new Player();
 let grid; // Prepare the grid variable to store a new grid instance after the DOM is generated after window load.
 
 // DOM grid creation.
@@ -409,6 +409,19 @@ document.addEventListener("keydown", event => {
     }
   }
 });
+
+function gameStart() {
+  if(game.started && confirm("Do you want to reset and start a new game?")) {
+    resetGame();
+    game.started = false;
+    gameStart();
+  } else {
+    player.spawn();
+    spawnRandomEnemy();
+    game.started = true;
+    // call the spawn timers to start
+  }
+}
 
 // Function for choosing a random enemy to spawn
 function spawnRandomEnemy() {
@@ -472,8 +485,8 @@ function isValidMove(dx, dy, movingObject) {
   // Unlike players, enemy units are not allowed to move into other objects, so we need additional checks before they move using this helper function
   function potentialEnemyCollision(x, y, enemy) {
     // Cycle through every object type and check if they exist in grid x,y. If an enemy exists, we must check if it's the same enemy calling this function, because we don't want it to self trigger.
-    for(const objectType of game.objectTypes) {
-      if((objectType !== "enemy" && grid.cell[x][y][objectType] !== null) || (objectType === "enemy" && grid.cell[x][y].enemy !== null && grid.cell[x][y].enemy.index !== enemy.index)) {
+    for(const objectType of objectTypes) {
+      if((objectType !== "enemy" && grid.cell[x][y][objectType] !== null) || (objectType === "enemy" && grid.cell[x][y].enemy !== null && grid.cell[x][y].enemy.index !== enemy.index) || grid.cell[x][y].player !== null) {
         return true;
       }
     }
@@ -508,12 +521,12 @@ function shootLaser(entity) {
 }
 
 function objectCollisionCheck(objectThatHit) {
-  const objectTypes = objectThatHit.canCollideWith;
+  const collisionTypes = objectThatHit.canCollideWith;
   const position = objectThatHit.position;
   for(const coords of position) { // Cycles through the coordinates of every segment of the laser object
     const x = coords[0];
     const y = coords[1];
-    for(const type of objectTypes) { // Cycles through each object type that this laser can collide with and checks it against the current object coordinate
+    for(const type of collisionTypes) { // Cycles through each object type that this laser can collide with and checks it against the current object coordinate
       if(grid.cell[x][y][type] !== null) {
         console.log(`Collision detected on cell ${x}, ${y}`);
         console.log(grid.cell[x][y]);
@@ -603,7 +616,17 @@ function clearObjectIntervals(objectToDelete) {
 }
 
 function gameOver() {
-  alert("You've run out of lives. GAME OVER");
+  clearAllTimers(); // This is to "freeze" the state ofthe game after player death.
+  alert("GAME OVER. Press play to start a new game.");
+}
+
+function resetGame() {
+  // Clear all timers to "freeze" the state of the game when the player dies.
+  clearAllTimers();
+  // Create all new game objects to reset everything to default, including clearing the grid styling and data stored in the grid.cell array of objects.
+  game = new Game();
+  player = new Player();
+  grid = new Grid();
 }
 
 function clearAllTimers() {
